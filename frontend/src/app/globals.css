@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0b0f19;
+  --foreground: #e2e8f0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+code {
+  font-family: var(--font-mono), monospace;
+}
+
+@keyframes fab-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.15); opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.chat-fab-ring {
+  animation: fab-pulse 2s ease-out infinite;
+  background: linear-gradient(135deg, rgb(6 182 212 / 0.5), rgb(139 92 246 / 0.5));
+}
+
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out;
+}
+
+.toast-enter {
+  animation: toast-in 0.3s ease-out;
+}
+
+.chat-modal {
+  transform-origin: bottom right;
+}

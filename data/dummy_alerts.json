@@ -1,0 +1,130 @@
+{
+  "alerts": [
+    {
+      "source": "prometheus",
+      "alert_type": "cpu_high",
+      "title": "CPU usage exceeds 95% on production nodes",
+      "description": "Sustained CPU utilization above 95% for 5+ minutes on api-gateway pods.",
+      "severity": "critical",
+      "service": "api-gateway",
+      "environment": "production",
+      "metric_value": 97.3,
+      "threshold": 95.0,
+      "hostname": "api-gateway-1.us-east-1.internal",
+      "namespace": "platform",
+      "pod_name": "api-gateway-a1b2c3d4",
+      "region": "us-east-1",
+      "tags": ["cpu", "performance", "production"],
+      "metadata": {
+        "runbook_url": "https://wiki.internal/runbooks/cpu_high",
+        "dashboard_url": "https://grafana.internal/d/api-gateway"
+      }
+    },
+    {
+      "source": "datadog",
+      "alert_type": "memory_leak",
+      "title": "Memory leak detected in order-processor",
+      "description": "Heap usage growing 12% per hour without traffic increase.",
+      "severity": "high",
+      "service": "order-processor",
+      "environment": "production",
+      "metric_value": 89.1,
+      "threshold": 80.0,
+      "tags": ["memory", "leak", "jvm"]
+    },
+    {
+      "source": "grafana",
+      "alert_type": "disk_full",
+      "title": "Disk usage critical on logging node",
+      "description": "Root volume at 98% capacity on log-aggregator-03.",
+      "severity": "critical",
+      "service": "log-aggregator",
+      "environment": "production",
+      "metric_value": 98.2,
+      "threshold": 90.0,
+      "tags": ["disk", "storage"]
+    },
+    {
+      "source": "prometheus",
+      "alert_type": "pod_crash",
+      "title": "Pod crash loop in payment namespace",
+      "description": "payment-worker CrashLoopBackOff — OOMKilled.",
+      "severity": "critical",
+      "service": "payment-worker",
+      "environment": "production-eu",
+      "namespace": "payments",
+      "tags": ["kubernetes", "pod", "crash"]
+    },
+    {
+      "source": "cloudwatch",
+      "alert_type": "database_timeout",
+      "title": "Database connection timeout spike",
+      "description": "PostgreSQL connection pool exhausted. 847 queries timing out.",
+      "severity": "high",
+      "service": "postgres-primary",
+      "environment": "production",
+      "metric_value": 847,
+      "threshold": 50,
+      "tags": ["database", "postgres"]
+    },
+    {
+      "source": "datadog",
+      "alert_type": "api_latency",
+      "title": "API latency P99 above SLA",
+      "description": "Checkout API P99 latency at 4.2s (SLA: 500ms).",
+      "severity": "high",
+      "service": "checkout-api",
+      "environment": "production",
+      "metric_value": 4200,
+      "threshold": 500,
+      "tags": ["latency", "api"]
+    },
+    {
+      "source": "grafana",
+      "alert_type": "ssl_certificate_expiring",
+      "title": "SSL certificate expiring in 7 days",
+      "description": "TLS cert for api.example.com expires soon. Auto-renewal failed.",
+      "severity": "medium",
+      "service": "ingress-controller",
+      "environment": "production",
+      "metric_value": 7,
+      "threshold": 14,
+      "tags": ["ssl", "security"]
+    },
+    {
+      "source": "prometheus",
+      "alert_type": "kubernetes_node_down",
+      "title": "Kubernetes node NotReady",
+      "description": "Node gke-prod-pool-4 is NotReady. 12 pods evicted.",
+      "severity": "critical",
+      "service": "gke-cluster-prod",
+      "environment": "production",
+      "tags": ["kubernetes", "node"]
+    },
+    {
+      "source": "pagerduty",
+      "alert_type": "high_error_rate",
+      "title": "High 5xx error rate on user-service",
+      "description": "Error rate at 18.4%. Correlates with deployment v2.14.0.",
+      "severity": "critical",
+      "service": "user-service",
+      "environment": "production",
+      "metric_value": 18.4,
+      "threshold": 5.0,
+      "tags": ["errors", "5xx"]
+    },
+    {
+      "source": "pagerduty",
+      "alert_type": "payment_service_unavailable",
+      "title": "Payment service unavailable",
+      "description": "Stripe webhook handler returning 503. EU region affected.",
+      "severity": "critical",
+      "service": "payment-gateway",
+      "environment": "production-eu",
+      "metric_value": 100,
+      "threshold": 1,
+      "tags": ["payment", "availability"]
+    }
+  ],
+  "generated_at": "2026-08-03T00:00:00Z"
+}

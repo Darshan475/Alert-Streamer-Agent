@@ -1,0 +1,121 @@
+export type AlertSeverity = "critical" | "high" | "medium" | "low" | "info";
+export type AlertStatus =
+  | "received"
+  | "validated"
+  | "deduplicated"
+  | "prioritized"
+  | "assigned"
+  | "investigating"
+  | "pending_review"
+  | "resolved"
+  | "duplicate"
+  | "rejected"
+  | "escalated";
+
+export type HumanReviewDecision = "approve" | "reject" | "escalate";
+
+export type Team =
+  | "platform"
+  | "sre"
+  | "database"
+  | "security"
+  | "payments"
+  | "frontend"
+  | "backend";
+
+export interface InvestigationResult {
+  root_cause: string;
+  impact_assessment: string;
+  recommendations: string[];
+  urgency_score: number;
+  estimated_resolution_minutes: number | null;
+  related_runbooks: string[];
+  investigated_at: string;
+}
+
+export interface HumanReview {
+  decision: HumanReviewDecision;
+  reviewer: string;
+  feedback: string;
+  reviewed_at: string;
+  override_recommendations: string[];
+}
+
+export interface AlertRecord {
+  id: string;
+  fingerprint: string;
+  source: string;
+  alert_type: string;
+  title: string;
+  description: string;
+  severity: AlertSeverity;
+  priority: number;
+  service: string;
+  environment: string;
+  team: Team;
+  category: string;
+  status: AlertStatus;
+  metric_value?: number | null;
+  threshold?: number | null;
+  hostname?: string | null;
+  namespace?: string | null;
+  pod_name?: string | null;
+  region?: string | null;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  received_at: string;
+  updated_at: string;
+  investigation?: InvestigationResult | null;
+  human_review?: HumanReview | null;
+}
+
+export interface AlertListResponse {
+  total: number;
+  items: AlertRecord[];
+}
+
+export interface PipelineStats {
+  total_alerts: number;
+  by_status: Record<string, number>;
+  by_priority: Record<string, number>;
+  by_team: Record<string, number>;
+}
+
+export interface ChatResponse {
+  reply: string;
+  alert_context_used: boolean;
+}
+
+export interface PipelineStage {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export const PIPELINE_STAGES: PipelineStage[] = [
+  { id: "ingest", label: "Ingest", description: "Receive alert payload" },
+  { id: "validate", label: "Validate", description: "Check required fields" },
+  { id: "dedup", label: "Deduplicate", description: "Suppress duplicates" },
+  { id: "prioritize", label: "Prioritize", description: "Assign P1–P5 priority" },
+  { id: "assign", label: "Assign Team", description: "Route to owning team" },
+  { id: "investigate", label: "Investigate", description: "LLM root cause analysis" },
+  { id: "human_review", label: "Human Review", description: "Engineer approve / reject / escalate" },
+  { id: "resolve", label: "Resolve", description: "Closed with human sign-off" },
+];
+
+export function statusToStageIndex(status: AlertStatus): number {
+  const map: Record<AlertStatus, number> = {
+    received: 0,
+    validated: 1,
+    deduplicated: 2,
+    rejected: 2,
+    duplicate: 2,
+    prioritized: 3,
+    assigned: 4,
+    investigating: 5,
+    pending_review: 6,
+    escalated: 6,
+    resolved: 7,
+  };
+  return map[status] ?? 0;
+}
