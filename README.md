@@ -1,4 +1,4 @@
-# Alert Streamer — Agentic AI Project
+# Alert Streamer Agent — Agentic AI Project
 
 Real-time alert ingestion pipeline with **NVIDIA Nemotron** LLM investigation, validation, deduplication, priority assignment, team routing, and a **Next.js** dashboard with enquiry chatbot.
 
