@@ -49,6 +49,9 @@ SEVERITY_PRIORITY: dict[AlertSeverity, int] = {
     AlertSeverity.INFO: 5,
 }
 
+# Only P1 and P2 require human review; P3+ auto-resolve after LLM investigation
+HUMAN_REVIEW_MAX_PRIORITY = 2
+
 
 def validate_alert(alert: AlertIngest) -> list[str]:
     """Return list of validation errors; empty means valid."""

@@ -126,7 +126,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   { id: "prioritize", label: "Prioritize", description: "Assign P1–P5 priority" },
   { id: "assign", label: "Assign Team", description: "Route to owning team" },
   { id: "investigate", label: "Investigate", description: "LLM root cause analysis" },
-  { id: "human_review", label: "Human Review", description: "Engineer approve / reject / escalate" },
+  { id: "human_review", label: "Human Review", description: "Engineer review for P1/P2 only" },
   { id: "resolve", label: "Resolve", description: "Closed with human sign-off" },
 ];
 

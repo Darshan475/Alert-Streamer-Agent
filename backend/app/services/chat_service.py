@@ -9,7 +9,7 @@ from app.services.llm_client import LLMClient
 CHAT_SYSTEM = """You are Alert Streamer Assistant — an SRE copilot for the Alert Streamer platform.
 Answer questions about alerts, investigations, human-in-the-loop reviews, priorities, and recommended actions.
 Be concise, actionable, and reference specific alert details when provided.
-Pipeline: validate → deduplicate → prioritize → assign team → LLM investigate → human review (approve/reject/escalate) → resolve."""
+Pipeline: validate → deduplicate → prioritize → assign team → LLM investigate → human review (P1/P2 only) → resolve. P3+ auto-resolve after investigation."""
 
 
 class ChatService:

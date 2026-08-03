@@ -4,7 +4,7 @@ import type { AlertStatus } from "@/lib/types";
 
 const FILTERS: { id: AlertStatus | "all"; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "pending_review", label: "Needs Review" },
+  { id: "pending_review", label: "Needs Review (P1/P2)" },
   { id: "investigating", label: "Investigating" },
   { id: "escalated", label: "Escalated" },
   { id: "resolved", label: "Resolved" },

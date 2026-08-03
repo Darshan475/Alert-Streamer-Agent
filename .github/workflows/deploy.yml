@@ -19,17 +19,7 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
-      - name: Verify API imports
-        run: |
-          python - <<'PY'
-          import traceback
-          try:
-              from app.main import app
-              print("API OK")
-          except Exception:
-              traceback.print_exc()
-              raise
-          PY
+      - run: python -c "from app.main import app; print('API OK')"
 
   build-frontend:
     runs-on: ubuntu-latest

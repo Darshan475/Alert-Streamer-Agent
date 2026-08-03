@@ -49,18 +49,36 @@ export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
 
   if (alert.human_review && alert.status !== "escalated") {
     const hr = alert.human_review;
+    const isAutoResolved = hr.reviewer === "system-auto-resolve";
     return (
-      <div className="rounded-xl border border-violet-500/25 bg-violet-500/5 p-4 space-y-2">
-        <div className="flex items-center gap-2 text-violet-300">
+      <div
+        className={`rounded-xl border p-4 space-y-2 ${
+          isAutoResolved
+            ? "border-emerald-500/25 bg-emerald-500/5"
+            : "border-violet-500/25 bg-violet-500/5"
+        }`}
+      >
+        <div
+          className={`flex items-center gap-2 ${isAutoResolved ? "text-emerald-300" : "text-violet-300"}`}
+        >
           <UserCheck className="h-4 w-4" />
-          <span className="font-medium text-sm">Human Review — {hr.decision}</span>
+          <span className="font-medium text-sm">
+            {isAutoResolved ? "Auto-Resolved" : `Human Review — ${hr.decision}`}
+          </span>
           <span className="text-xs text-slate-500 ml-auto">{formatTime(hr.reviewed_at)}</span>
         </div>
         <p className="text-sm text-slate-400">
-          Reviewer: <span className="text-slate-200">{hr.reviewer}</span>
+          {isAutoResolved ? "Resolved by" : "Reviewer:"}{" "}
+          <span className="text-slate-200">{isAutoResolved ? "pipeline policy" : hr.reviewer}</span>
         </p>
         {hr.feedback && (
-          <p className="text-sm text-slate-400 border-l-2 border-violet-500/40 pl-3">{hr.feedback}</p>
+          <p
+            className={`text-sm text-slate-400 border-l-2 pl-3 ${
+              isAutoResolved ? "border-emerald-500/40" : "border-violet-500/40"
+            }`}
+          >
+            {hr.feedback}
+          </p>
         )}
       </div>
     );
@@ -77,7 +95,8 @@ export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
       </div>
 
       <p className="text-xs text-slate-400">
-        LLM investigation is complete. Approve to resolve, reject as false positive, or escalate priority.
+        LLM investigation complete. P1/P2 alerts require your approval — approve to resolve, reject as false
+        positive, or escalate priority.
       </p>
 
       <div className="grid grid-cols-2 gap-2">

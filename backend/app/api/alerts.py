@@ -15,7 +15,7 @@ from app.models.schemas import (
     HumanReviewRequest,
     PipelineStats,
 )
-from app.services.alert_pipeline import AlertPipeline
+from app.services.alert_pipeline import HUMAN_REVIEW_MAX_PRIORITY, AlertPipeline
 from app.services.alert_store import AlertStore
 from app.services.investigation_agent import InvestigationAgent
 
@@ -53,8 +53,23 @@ async def _run_investigation(alert_id: UUID) -> None:
 
     investigation = await agent.investigate(alert)
     alert.investigation = investigation
-    alert.status = AlertStatus.PENDING_REVIEW
-    alert.updated_at = datetime.now(UTC)
+    now = datetime.now(UTC)
+
+    if alert.priority <= HUMAN_REVIEW_MAX_PRIORITY:
+        alert.status = AlertStatus.PENDING_REVIEW
+    else:
+        alert.status = AlertStatus.RESOLVED
+        alert.human_review = HumanReview(
+            decision=HumanReviewDecision.APPROVE,
+            reviewer="system-auto-resolve",
+            feedback=(
+                f"Auto-resolved: P{alert.priority} alerts skip human review "
+                f"(only P1–P{HUMAN_REVIEW_MAX_PRIORITY} require approval)."
+            ),
+            reviewed_at=now,
+        )
+
+    alert.updated_at = now
     await store.update(alert)
 
 
