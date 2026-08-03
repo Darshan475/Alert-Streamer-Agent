@@ -6,13 +6,14 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: http://localhost:8000,http://localhost:3000
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
 
+  # Optional Next.js UI — run with: docker compose --profile nextjs up --build
   web:
     build:
       context: ./frontend
@@ -25,3 +26,5 @@ services:
         condition: service_healthy
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
+    profiles:
+      - nextjs

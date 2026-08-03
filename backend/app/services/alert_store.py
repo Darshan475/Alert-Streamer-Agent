@@ -37,7 +37,7 @@ class AlertStore:
     async def get(self, alert_id: UUID) -> AlertRecord | None:
         return self._alerts.get(alert_id)
 
-    async def list(
+    async def list_alerts(
         self,
         *,
         status: AlertStatus | None = None,

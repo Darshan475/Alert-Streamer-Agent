@@ -99,7 +99,7 @@ async def list_alerts(
     offset: int = Query(0, ge=0),
     store: AlertStore = Depends(get_store),
 ) -> AlertListResponse:
-    items, total = await store.list(status=status_filter, team=team, limit=limit, offset=offset)
+    items, total = await store.list_alerts(status=status_filter, team=team, limit=limit, offset=offset)
     return AlertListResponse(total=total, items=items)
 
 

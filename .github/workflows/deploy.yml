@@ -20,6 +20,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
       - run: python -c "from app.main import app; print('API OK')"
+      - run: test -f app/static/index.html
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -36,4 +37,6 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: https://alert-streamer-api.onrender.com
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  # Render auto-deploys on push when connected to GitHub (render.yaml autoDeploy: true)

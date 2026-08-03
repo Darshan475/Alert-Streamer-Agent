@@ -1,9 +1,9 @@
-# Render Blueprint — deploy full stack from GitHub
+# Render Blueprint — single FastAPI service (API + dashboard)
 # https://dashboard.render.com/select-repo?type=blueprint
 
 services:
   - type: web
-    name: alert-streamer-api
+    name: alert-streamer
     runtime: python
     plan: free
     rootDir: backend
@@ -23,16 +23,4 @@ services:
       - key: ALERT_STREAMER_API_KEY
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://alert-streamer-web.onrender.com
-
-  - type: web
-    name: alert-streamer-web
-    runtime: node
-    plan: free
-    rootDir: frontend
-    autoDeploy: true
-    buildCommand: npm install && npm run build
-    startCommand: npm start -- -p $PORT
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        value: https://alert-streamer-api.onrender.com
+        value: https://alert-streamer.onrender.com

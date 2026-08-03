@@ -1,8 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -17,6 +20,8 @@ from app.services.llm_client import LLMClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 settings = get_settings()
 alert_store = AlertStore()
@@ -42,8 +47,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Alert Streamer API",
-    description="Alert ingestion, validation, deduplication, and Nemotron-powered investigation",
+    title="Alert Streamer",
+    description="Alert ingestion, LLM investigation, and built-in dashboard (optional Next.js UI in frontend/)",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -72,3 +77,11 @@ async def health():
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
     }
+
+
+@app.get("/")
+async def dashboard():
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
