@@ -17,7 +17,7 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     },
     "huggingface": {
         "base_url": "https://router.huggingface.co/v1",
-        "model": "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4:fastest",
+        "model": "meta-llama/Meta-Llama-3-8B-Instruct:fastest",
     },
     "nvidia": {
         "base_url": "https://integrate.api.nvidia.com/v1",
@@ -29,14 +29,51 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     },
 }
 
-PLACEHOLDER_KEYS = frozenset({"your_api_key_here", "your_nvidia_api_key_here", "your_hf_token_here", ""})
+PLACEHOLDER_KEYS = frozenset(
+    {"your_api_key_here", "your_nvidia_api_key_here", "your_hf_token_here", ""}
+)
+
+DEFAULT_LLM_PROVIDER: LLMProvider = "openrouter"
+
+LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
+    "openrouter": {
+        "label": "OpenRouter",
+        "free": True,
+        "key_hint": "LLM_API_KEY from openrouter.ai/keys",
+        "signup_url": "https://openrouter.ai/keys",
+    },
+    "groq": {
+        "label": "Groq",
+        "free": True,
+        "key_hint": "LLM_API_KEY from console.groq.com",
+        "signup_url": "https://console.groq.com/keys",
+    },
+    "huggingface": {
+        "label": "Hugging Face",
+        "free": True,
+        "key_hint": "Fine-grained HF token with 'Make calls to Inference Providers'",
+        "signup_url": "https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained",
+    },
+    "nvidia": {
+        "label": "NVIDIA NIM",
+        "free": False,
+        "key_hint": "LLM_API_KEY or NVIDIA_API_KEY from build.nvidia.com",
+        "signup_url": "https://build.nvidia.com",
+    },
+    "offline": {
+        "label": "Offline (rule-based)",
+        "free": True,
+        "key_hint": "No API key required",
+        "signup_url": "",
+    },
+}
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM — default to free OpenRouter for testing; set LLM_PROVIDER=nvidia later
-    llm_provider: LLMProvider = "openrouter"
+    # LLM — default to free OpenRouter; override via dashboard or LLM_PROVIDER env
+    llm_provider: LLMProvider = DEFAULT_LLM_PROVIDER
     llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = ""
@@ -65,35 +102,51 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
-    @property
-    def active_llm_base_url(self) -> str:
-        if self.llm_base_url:
+    def base_url_for(self, provider: LLMProvider | None = None) -> str:
+        active = provider or self.llm_provider
+        if self.llm_base_url and (provider is None or provider == self.llm_provider):
             return self.llm_base_url.rstrip("/")
-        return PROVIDER_DEFAULTS[self.llm_provider]["base_url"].rstrip("/")
+        return PROVIDER_DEFAULTS[active]["base_url"].rstrip("/")
 
-    @property
-    def active_llm_model(self) -> str:
-        if self.llm_model:
+    def model_for(self, provider: LLMProvider | None = None) -> str:
+        active = provider or self.llm_provider
+        if self.llm_model and (provider is None or provider == self.llm_provider):
             return self.llm_model
-        if self.llm_provider == "nvidia" and self.nvidia_model:
+        if active == "nvidia" and self.nvidia_model:
             return self.nvidia_model
-        return PROVIDER_DEFAULTS[self.llm_provider]["model"]
+        return PROVIDER_DEFAULTS[active]["model"]
 
-    @property
-    def active_llm_api_key(self) -> str:
+    def api_key_for(self, provider: LLMProvider | None = None) -> str:
+        active = provider or self.llm_provider
         if self.llm_api_key and self.llm_api_key not in PLACEHOLDER_KEYS:
             return self.llm_api_key
-        if self.llm_provider == "huggingface" and self.hf_token and self.hf_token not in PLACEHOLDER_KEYS:
+        if active == "huggingface" and self.hf_token and self.hf_token not in PLACEHOLDER_KEYS:
             return self.hf_token
-        if self.llm_provider == "nvidia" and self.nvidia_api_key and self.nvidia_api_key not in PLACEHOLDER_KEYS:
+        if active == "nvidia" and self.nvidia_api_key and self.nvidia_api_key not in PLACEHOLDER_KEYS:
             return self.nvidia_api_key
         return ""
 
+    def is_live_for(self, provider: LLMProvider | None = None) -> bool:
+        active = provider or self.llm_provider
+        if active == "offline":
+            return False
+        return bool(self.api_key_for(active))
+
+    @property
+    def active_llm_base_url(self) -> str:
+        return self.base_url_for()
+
+    @property
+    def active_llm_model(self) -> str:
+        return self.model_for()
+
+    @property
+    def active_llm_api_key(self) -> str:
+        return self.api_key_for()
+
     @property
     def llm_is_live(self) -> bool:
-        if self.llm_provider == "offline":
-            return False
-        return bool(self.active_llm_api_key)
+        return self.is_live_for()
 
 
 @lru_cache

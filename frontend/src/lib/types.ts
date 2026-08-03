@@ -86,6 +86,33 @@ export interface ChatResponse {
   alert_context_used: boolean;
 }
 
+export type LlmProviderId = "openrouter" | "groq" | "huggingface" | "nvidia" | "offline";
+
+export interface LlmProviderInfo {
+  id: LlmProviderId;
+  label: string;
+  model: string;
+  free: boolean;
+  is_default: boolean;
+  configured: boolean;
+  key_hint: string;
+  signup_url: string;
+}
+
+export interface LlmProvidersResponse {
+  active_provider: LlmProviderId;
+  default_provider: LlmProviderId;
+  providers: LlmProviderInfo[];
+}
+
+export interface SetLlmProviderResponse {
+  active_provider: LlmProviderId;
+  label: string;
+  model: string;
+  configured: boolean;
+  message: string;
+}
+
 export interface PipelineStage {
   id: string;
   label: string;

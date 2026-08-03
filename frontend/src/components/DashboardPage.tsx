@@ -18,7 +18,7 @@ export function DashboardPage() {
 
   const { data: alertsData, error, mutate } = useAlerts();
   const { data: stats, mutate: mutateStats } = useStats();
-  const { data: health } = useHealth();
+  const { mutate: mutateHealth } = useHealth();
 
   const silentRefresh = useCallback(() => {
     void mutate();
@@ -71,9 +71,10 @@ export function DashboardPage() {
 
         <StatsCards
           stats={stats}
-          llmConfigured={health?.llm_configured}
-          llmProvider={health?.llm_provider}
-          model={health?.model}
+          onLlmChanged={(message) => {
+            void mutateHealth();
+            setToast({ message, type: "success" });
+          }}
         />
 
         <div className="grid lg:grid-cols-5 gap-6">

@@ -1,16 +1,15 @@
 "use client";
 
 import type { PipelineStats } from "@/lib/types";
+import { LlmSelector } from "@/components/LlmSelector";
 import { Activity, AlertTriangle, Users, Layers } from "lucide-react";
 
 interface Props {
   stats: PipelineStats | undefined;
-  llmConfigured?: boolean;
-  llmProvider?: string;
-  model?: string;
+  onLlmChanged?: (message: string) => void;
 }
 
-export function StatsCards({ stats, llmConfigured, llmProvider, model }: Props) {
+export function StatsCards({ stats, onLlmChanged }: Props) {
   const cards = [
     {
       label: "Total Alerts",
@@ -52,14 +51,7 @@ export function StatsCards({ stats, llmConfigured, llmProvider, model }: Props) 
           <p className="mt-2 text-2xl font-semibold text-white">{card.value}</p>
         </div>
       ))}
-      <div className="col-span-2 lg:col-span-4 rounded-xl border border-slate-700/60 bg-slate-900/30 px-4 py-2 flex items-center justify-between text-sm">
-        <span className="text-slate-400">LLM Engine</span>
-        <span className={llmConfigured ? "text-emerald-400" : "text-amber-400"}>
-          {llmConfigured
-            ? `${llmProvider ?? "LLM"} · ${model}`
-            : `No API key — set LLM_API_KEY (${llmProvider ?? "openrouter"})`}
-        </span>
-      </div>
+      <LlmSelector onChanged={onLlmChanged} />
     </div>
   );
 }

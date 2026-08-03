@@ -7,7 +7,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.api import alerts, chat
+from app.api import alerts, chat, llm
 from app.config import get_settings
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
@@ -60,6 +60,7 @@ app.add_middleware(
 
 app.include_router(alerts.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(llm.router, prefix="/api/v1")
 
 
 @app.get("/health")

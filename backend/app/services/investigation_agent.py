@@ -5,7 +5,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TypedDict
 
-from langgraph.graph import END, StateGraph
+from langgraph.graph import END, START, StateGraph
 
 from app.models.schemas import AlertRecord, InvestigationResult
 from app.services.llm_client import LLMClient
@@ -43,7 +43,7 @@ class InvestigationAgent:
         graph = StateGraph(InvestigationState)
         graph.add_node("analyze", self._analyze_node)
         graph.add_node("parse", self._parse_node)
-        graph.set_entry_point("analyze")
+        graph.add_edge(START, "analyze")
         graph.add_edge("analyze", "parse")
         graph.add_edge("parse", END)
         return graph.compile()

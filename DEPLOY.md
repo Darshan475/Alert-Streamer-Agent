@@ -34,6 +34,24 @@ Deploy both services with one click from GitHub.
 
 > Free tier sleeps after 15 min idle — first request may take ~30s to wake up.
 
+### Access your deployed app
+
+1. Open **[Render Dashboard](https://dashboard.render.com/)** → your services list
+2. Click **alert-streamer-web** → copy the URL at the top (usually `https://alert-streamer-web.onrender.com`)
+3. Click **alert-streamer-api** → check **Logs** if the dashboard cannot reach the API
+
+### Automate deploy (push → live)
+
+Render auto-deploys when you push to `main` (enabled via `autoDeploy: true` in `render.yaml`):
+
+1. Render Dashboard → each service → **Settings** → confirm **Auto-Deploy** is **Yes**
+2. Ensure GitHub is connected: **Settings** → **Build & Deploy** → **Branch** = `main`
+3. Every `git push origin main` triggers:
+   - **GitHub Actions** — validates backend + frontend build
+   - **Render** — rebuilds and redeploys both services
+
+Manual redeploy: Render Dashboard → service → **Manual Deploy** → **Deploy latest commit**.
+
 ---
 
 ## Option B — Vercel (Frontend) + Render (Backend)

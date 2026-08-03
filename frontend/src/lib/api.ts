@@ -45,6 +45,19 @@ export async function getHealth(): Promise<{
   return fetchJson("/health");
 }
 
+export async function getLlmProviders(): Promise<import("./types").LlmProvidersResponse> {
+  return fetchJson("/api/v1/llm/providers");
+}
+
+export async function setLlmProvider(
+  provider: import("./types").LlmProviderId
+): Promise<import("./types").SetLlmProviderResponse> {
+  return fetchJson("/api/v1/llm/provider", {
+    method: "PUT",
+    body: JSON.stringify({ provider }),
+  });
+}
+
 export async function sendChat(
   message: string,
   alertId?: string

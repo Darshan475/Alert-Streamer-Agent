@@ -7,30 +7,48 @@ from typing import Any
 
 import httpx
 
-from app.config import Settings
+from app.config import LLMProvider, Settings
 
 logger = logging.getLogger(__name__)
 
-PLACEHOLDER_KEYS = {"your_api_key_here", "your_nvidia_api_key_here", ""}
-
 
 class LLMClient:
-    """OpenAI-compatible client for OpenRouter, Groq, and NVIDIA NIM."""
+    """OpenAI-compatible client for OpenRouter, Groq, Hugging Face, and NVIDIA NIM."""
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        self._provider_override: LLMProvider | None = None
 
     @property
-    def provider(self) -> str:
-        return self._settings.llm_provider
+    def provider(self) -> LLMProvider:
+        return self._provider_override or self._settings.llm_provider
+
+    def set_provider(self, provider: LLMProvider) -> None:
+        self._provider_override = provider
+        logger.info(
+            "LLM provider switched to %s (configured=%s, model=%s)",
+            provider,
+            self.is_configured,
+            self.model,
+        )
+
+    def model_for(self, provider: LLMProvider | None = None) -> str:
+        return self._settings.model_for(provider or self.provider)
+
+    def is_configured_for(self, provider: LLMProvider) -> bool:
+        if provider == "offline":
+            return True
+        return self._settings.is_live_for(provider)
 
     @property
     def model(self) -> str:
-        return self._settings.active_llm_model
+        return self.model_for()
 
     @property
     def is_configured(self) -> bool:
-        return self._settings.llm_is_live
+        if self.provider == "offline":
+            return False
+        return self._settings.is_live_for(self.provider)
 
     async def chat(
         self,
@@ -40,11 +58,11 @@ class LLMClient:
         max_tokens: int | None = None,
         json_mode: bool = False,
     ) -> str:
-        if not self.is_configured:
+        if self.provider == "offline" or not self.is_configured:
             return self._fallback_response(messages)
 
         headers: dict[str, str] = {
-            "Authorization": f"Bearer {self._settings.active_llm_api_key}",
+            "Authorization": f"Bearer {self._settings.api_key_for(self.provider)}",
             "Content-Type": "application/json",
         }
         if self.provider == "openrouter":
@@ -62,14 +80,13 @@ class LLMClient:
         if json_mode:
             body["response_format"] = {"type": "json_object"}
 
-        # Nemotron-specific thinking toggle (ignored by other providers)
         if self.provider == "nvidia":
             body["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
 
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
-                    f"{self._settings.active_llm_base_url}/chat/completions",
+                    f"{self._settings.base_url_for(self.provider)}/chat/completions",
                     headers=headers,
                     json=body,
                 )
@@ -78,8 +95,9 @@ class LLMClient:
             content = data["choices"][0]["message"]["content"]
             return self._strip_thinking_tags(content)
         except httpx.HTTPStatusError as exc:
-            logger.error("LLM HTTP error [%s]: %s", self.provider, exc.response.text[:300])
-            return self._fallback_response(messages, error=str(exc))
+            detail = exc.response.text[:300]
+            logger.error("LLM HTTP error [%s]: %s", self.provider, detail)
+            return self._fallback_response(messages, error=self._format_http_error(exc, detail))
         except Exception as exc:
             logger.exception("LLM request failed [%s]", self.provider)
             return self._fallback_response(messages, error=str(exc))
@@ -95,6 +113,20 @@ class LLMClient:
         for pattern in patterns:
             cleaned = re.sub(pattern, "", cleaned, flags=re.DOTALL | re.IGNORECASE)
         return cleaned.strip()
+
+    def _format_http_error(self, exc: httpx.HTTPStatusError, detail: str) -> str:
+        code = exc.response.status_code
+        if self.provider == "huggingface" and code in (401, 403):
+            if "sufficient permissions" in detail.lower() or "inference providers" in detail.lower():
+                return (
+                    f"HTTP {code}: HF token lacks 'Make calls to Inference Providers' permission. "
+                    "Create a fine-grained token at huggingface.co/settings/tokens with that permission enabled."
+                )
+            return (
+                f"HTTP {code}: Invalid or expired HF token. "
+                "Create a fine-grained token with 'Make calls to Inference Providers' at huggingface.co/settings/tokens"
+            )
+        return str(exc)
 
     def _fallback_response(self, messages: list[dict[str, str]], error: str | None = None) -> str:
         """Rule-based fallback when no API key or provider call fails."""
