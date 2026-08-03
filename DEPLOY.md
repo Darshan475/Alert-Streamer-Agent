@@ -15,8 +15,8 @@ Repository: [github.com/Darshan475/Alert-Streamer-Agent](https://github.com/Dars
 3. Creates **`alert-streamer`** — Python FastAPI (API + dashboard)
 4. Add environment variables:
    ```
-   HF_TOKEN=hf_your_token_here
-   LLM_PROVIDER=huggingface
+   GEMINI_API_KEY=your_key_from_aistudio.google.com/apikey
+   LLM_PROVIDER=gemini
    ```
 5. Wait ~5–10 min.
 
@@ -54,8 +54,9 @@ Open **http://localhost:8000**
 
 | Variable | Required | Example |
 |----------|----------|---------|
-| `HF_TOKEN` or `LLM_API_KEY` | For live LLM | `hf_...` |
-| `LLM_PROVIDER` | Yes | `huggingface` |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | For live LLM (default) | from [AI Studio](https://aistudio.google.com/apikey) |
+| `LLM_PROVIDER` | Optional | `gemini` (default) |
+| `LLM_API_KEY` / `HF_TOKEN` | Other providers | `sk-or-v1-...` or `hf_...` |
 | `ALERT_STREAMER_API_KEY` | Yes | auto on Render |
 | `CORS_ORIGINS` | Optional | `http://localhost:8000,http://localhost:3000` |
 

@@ -86,7 +86,7 @@ export interface ChatResponse {
   alert_context_used: boolean;
 }
 
-export type LlmProviderId = "openrouter" | "groq" | "huggingface" | "nvidia" | "offline";
+export type LlmProviderId = "gemini" | "openrouter" | "groq" | "huggingface" | "nvidia" | "offline";
 
 export interface LlmProviderInfo {
   id: LlmProviderId;

@@ -151,7 +151,7 @@ class LLMClient:
 
         hint = (
             f"Set LLM_API_KEY in backend/.env (provider: {self.provider}). "
-            "Free keys: huggingface.co/settings/tokens, openrouter.ai, or console.groq.com"
+            "Free keys: aistudio.google.com/apikey, openrouter.ai, or console.groq.com"
         )
         if error:
             return f"LLM call failed ({self.provider}): {error[:200]}. {hint}"

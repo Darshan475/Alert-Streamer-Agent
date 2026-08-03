@@ -3,10 +3,14 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-LLMProvider = Literal["openrouter", "groq", "huggingface", "nvidia", "offline"]
+LLMProvider = Literal["gemini", "openrouter", "groq", "huggingface", "nvidia", "offline"]
 
-# Free-tier defaults for local testing (swap to nvidia later for production)
+# Provider defaults — Gemini is the default (Google AI Studio free tier)
 PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
+    "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.0-flash",
+    },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
         "model": "meta-llama/llama-3.3-70b-instruct:free",
@@ -30,12 +34,25 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
 }
 
 PLACEHOLDER_KEYS = frozenset(
-    {"your_api_key_here", "your_nvidia_api_key_here", "your_hf_token_here", ""}
+    {
+        "your_api_key_here",
+        "your_nvidia_api_key_here",
+        "your_hf_token_here",
+        "your_gemini_api_key_here",
+        "your_google_api_key_here",
+        "",
+    }
 )
 
-DEFAULT_LLM_PROVIDER: LLMProvider = "openrouter"
+DEFAULT_LLM_PROVIDER: LLMProvider = "gemini"
 
 LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
+    "gemini": {
+        "label": "Google Gemini",
+        "free": True,
+        "key_hint": "GEMINI_API_KEY from aistudio.google.com/apikey",
+        "signup_url": "https://aistudio.google.com/apikey",
+    },
     "openrouter": {
         "label": "OpenRouter",
         "free": True,
@@ -72,11 +89,13 @@ LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM — default to free OpenRouter; override via dashboard or LLM_PROVIDER env
+    # LLM — default Google Gemini; override via dashboard or LLM_PROVIDER env
     llm_provider: LLMProvider = DEFAULT_LLM_PROVIDER
     llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = ""
+    gemini_api_key: str = ""
+    google_api_key: str = ""  # alias for GEMINI_API_KEY
     hf_token: str = ""  # HF_TOKEN — alternative to LLM_API_KEY for Hugging Face
 
     # Legacy NVIDIA vars (still supported when llm_provider=nvidia)
@@ -118,6 +137,11 @@ class Settings(BaseSettings):
 
     def api_key_for(self, provider: LLMProvider | None = None) -> str:
         active = provider or self.llm_provider
+        if active == "gemini":
+            for key in (self.gemini_api_key, self.google_api_key, self.llm_api_key):
+                if key and key not in PLACEHOLDER_KEYS:
+                    return key
+            return ""
         if self.llm_api_key and self.llm_api_key not in PLACEHOLDER_KEYS:
             return self.llm_api_key
         if active == "huggingface" and self.hf_token and self.hf_token not in PLACEHOLDER_KEYS:
