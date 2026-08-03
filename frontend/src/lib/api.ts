@@ -7,7 +7,6 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...init?.headers,
     },
-    next: init?.method === "GET" ? { revalidate: 5 } : undefined,
   });
   if (!res.ok) {
     const text = await res.text();
