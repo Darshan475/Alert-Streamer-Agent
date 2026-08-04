@@ -116,6 +116,7 @@ class Settings(BaseSettings):
     dedup_ttl_seconds: int = 3600
     llm_max_tokens: int = 4096
     llm_temperature: float = 0.3
+    seed_demo_alerts: bool = True
 
     @property
     def cors_origin_list(self) -> list[str]:

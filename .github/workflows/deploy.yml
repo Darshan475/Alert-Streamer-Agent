@@ -5,6 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_BACKEND_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+  VERCEL_FRONTEND_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+
 jobs:
   build-backend:
     runs-on: ubuntu-latest
@@ -21,6 +26,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -c "from app.main import app; print('API OK')"
       - run: test -f app/static/index.html
+      - run: test -f data/dummy_alerts.json
 
   build-frontend:
     runs-on: ubuntu-latest
@@ -37,6 +43,40 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:8000' }}
+
+  deploy-backend-vercel:
+    needs: build-backend
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && secrets.VERCEL_TOKEN != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm i -g vercel@latest
+      - name: Deploy backend to Vercel
+        working-directory: backend
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+
+  deploy-frontend-vercel:
+    needs: [build-frontend, deploy-backend-vercel]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && secrets.VERCEL_TOKEN != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm i -g vercel@latest
+      - name: Deploy frontend to Vercel
+        working-directory: frontend
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
 
   # Render auto-deploys on push when connected to GitHub (render.yaml autoDeploy: true)

@@ -116,6 +116,16 @@ class LLMClient:
 
     def _format_http_error(self, exc: httpx.HTTPStatusError, detail: str) -> str:
         code = exc.response.status_code
+        if code == 429:
+            return (
+                "Provider rate limit exceeded (HTTP 429). Using offline fallback — "
+                "switch provider in the dashboard or add a key for OpenRouter/Groq."
+            )
+        if self.provider == "gemini" and code in (401, 403):
+            return (
+                f"HTTP {code}: Invalid Gemini API key. "
+                "Set GEMINI_API_KEY in backend/.env from aistudio.google.com/apikey"
+            )
         if self.provider == "huggingface" and code in (401, 403):
             if "sufficient permissions" in detail.lower() or "inference providers" in detail.lower():
                 return (
@@ -149,15 +159,56 @@ class LLMClient:
                 }
             )
 
-        hint = (
+        hint = self._key_hint()
+        if error:
+            if "429" in error or "rate limit" in error.lower():
+                return self._offline_chat_reply(user_msg, quota_exceeded=True)
+            return f"LLM call failed ({self.provider}): {error[:200]}. {hint}"
+        return (
+            f"No LLM API key configured. {self._key_hint()} "
+            "Alerts still ingest and display — only AI investigation uses the fallback."
+        )
+
+    def _key_hint(self) -> str:
+        if self.provider == "gemini":
+            return "Set GEMINI_API_KEY in backend/.env (aistudio.google.com/apikey)."
+        return (
             f"Set LLM_API_KEY in backend/.env (provider: {self.provider}). "
             "Free keys: aistudio.google.com/apikey, openrouter.ai, or console.groq.com"
         )
-        if error:
-            return f"LLM call failed ({self.provider}): {error[:200]}. {hint}"
+
+    def _offline_chat_reply(self, user_msg: str, *, quota_exceeded: bool = False) -> str:
+        """Rule-based copilot when the LLM provider is unavailable."""
+        lower = user_msg.lower()
+        prefix = (
+            "Gemini quota exceeded — replying offline. "
+            if quota_exceeded
+            else "Offline mode — "
+        )
+
+        if any(k in lower for k in ("p1", "priority 1", "critical")):
+            return (
+                f"{prefix}P1 alerts are highest severity. They require human review after LLM "
+                "investigation. Check the Investigation panel, then Approve, Reject, or Escalate."
+            )
+        if any(k in lower for k in ("p2", "priority 2", "high")):
+            return (
+                f"{prefix}P2 alerts also require human-in-the-loop review before resolution. "
+                "Select an alert from the stream for context-aware guidance."
+            )
+        if "human" in lower or "review" in lower or "hitl" in lower:
+            return (
+                f"{prefix}Human review applies to P1–P2 only. P3+ auto-resolve after investigation. "
+                "Use Approve / Reject / Escalate on the selected alert."
+            )
+        if "alert" in lower or "data" in lower or "empty" in lower:
+            return (
+                f"{prefix}Alerts live in the in-memory store and reset on restart. "
+                "Demo alerts auto-seed on startup; run `python scripts/trigger_alerts.py` for more."
+            )
         return (
-            f"No LLM API key configured. {hint} "
-            "Alerts still ingest and display — only AI investigation uses the fallback."
+            f"{prefix}I can help with alert priorities, investigations, and human review. "
+            "Select an alert for context, or ask about P1/P2 workflow."
         )
 
 

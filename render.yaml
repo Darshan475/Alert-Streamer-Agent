@@ -26,3 +26,5 @@ services:
         generateValue: true
       - key: CORS_ORIGINS
         value: https://alert-streamer.onrender.com
+      - key: SEED_DEMO_ALERTS
+        value: "true"

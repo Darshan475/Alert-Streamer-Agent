@@ -15,6 +15,7 @@ from app.config import get_settings
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
 from app.services.chat_service import ChatService
+from app.services.demo_seed import seed_demo_alerts
 from app.services.investigation_agent import InvestigationAgent
 from app.services.llm_client import LLMClient
 
@@ -42,6 +43,10 @@ async def lifespan(app: FastAPI):
         llm_client.is_configured,
         llm_client.model,
     )
+    if settings.seed_demo_alerts:
+        from app.api.alerts import _run_investigation
+
+        await seed_demo_alerts(alert_store, alert_pipeline, _run_investigation)
     yield
     logger.info("Alert Streamer shutting down")
 
