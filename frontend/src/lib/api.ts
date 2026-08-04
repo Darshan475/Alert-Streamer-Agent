@@ -100,14 +100,4 @@ export async function agentAutoStream(
   });
 }
 
-export async function sendChat(
-  message: string,
-  alertId?: string
-): Promise<import("./types").ChatResponse> {
-  return fetchJson("/api/v1/chat", {
-    method: "POST",
-    body: JSON.stringify({ message, alert_id: alertId ?? null }),
-  });
-}
-
 export { API_BASE };

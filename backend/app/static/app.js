@@ -87,7 +87,7 @@ function renderAlertList() {
   const container = document.getElementById("alert-list");
   if (!list.length) {
     container.innerHTML = `<p class="muted" style="padding:1rem;text-align:center;color:#64748b">
-      No alerts yet. Run <code>python scripts/trigger_alerts.py</code> to ingest dummy data.</p>`;
+      No alerts yet. Use Trigger Events or the agent API to generate alerts.</p>`;
     return;
   }
   container.innerHTML = list.map((a) => `
@@ -115,7 +115,7 @@ function renderDetail() {
   const alert = state.alerts.find((a) => a.id === state.selectedId);
   if (!alert) {
     box.className = "alert-detail empty";
-    box.innerHTML = `<p>Select an alert to review LLM investigation</p><p class="muted">P1/P2 require approval · P3+ auto-resolve</p>`;
+    box.innerHTML = `<p>Select an alert to view pipeline stages</p><p class="muted">Ingest → Validate → Deduplicate → Prioritize</p>`;
     return;
   }
   box.className = "alert-detail";
@@ -125,24 +125,10 @@ function renderDetail() {
     return `<span class="${cls}">${label}</span>`;
   }).join("");
 
-  let invHtml = "";
-  if (alert.investigation) {
-    const inv = alert.investigation;
-    invHtml = `<div class="investigation">
-      <strong style="color:#6ee7b7">LLM Investigation</strong>
-      <h4>Root Cause</h4><p>${esc(inv.root_cause)}</p>
-      <h4>Impact</h4><p>${esc(inv.impact_assessment)}</p>
-      <h4>Recommendations</h4><ul>${inv.recommendations.map((r) => `<li>${esc(r)}</li>`).join("")}</ul>
-      <p style="color:#fbbf24">Urgency: ${inv.urgency_score}/10</p>
-    </div>`;
-  } else if (alert.status === "investigating") {
-    invHtml = `<p style="color:#fbbf24;animation:pulse 2s infinite">LLM is investigating…</p>`;
-  }
-
-  let reviewHtml = "";
+  let logHtml = "";
   const log = alert.metadata?.pipeline_agent_log;
   if (Array.isArray(log) && log.length) {
-    reviewHtml = `<div class="review-panel auto">
+    logHtml = `<div class="review-panel auto">
       <strong style="color:#67e8f9">Agent Pipeline Log</strong>
       <ul style="font-size:0.875rem;color:#94a3b8;margin:0.5rem 0;padding-left:1rem">
         ${log.map((e) => `<li><span style="color:#6ee7b7">${esc(e.stage)}</span>${e.reasoning ? " — " + esc(e.reasoning) : ""}</li>`).join("")}
@@ -160,7 +146,7 @@ function renderDetail() {
     <p style="color:#94a3b8">${esc(alert.description)}</p>
     <div class="pipeline">${pipeline}</div>
     <p style="font-size:0.875rem;color:#64748b">${alert.service} · ${alert.environment} · ${alert.team}</p>
-    ${invHtml}${reviewHtml}
+    ${logHtml}
   `;
 }
 
@@ -193,8 +179,8 @@ function updateLlmStatus() {
   const p = state.llmProviders?.providers.find((x) => x.id === state.llmProviders.active_provider);
   if (!p) return;
   if (p.id === "offline") {
-    el.textContent = "Offline fallback · no API key needed";
-    el.className = "llm-status ok";
+    el.textContent = "Select a provider and add an API key";
+    el.className = "llm-status warn";
   } else if (p.configured) {
     el.textContent = `${p.label} · ${p.model}`;
     el.className = "llm-status ok";
@@ -229,35 +215,6 @@ function esc(s) {
   d.textContent = s ?? "";
   return d.innerHTML;
 }
-
-// Chat
-const chatModal = document.getElementById("chat-modal");
-document.getElementById("chat-fab").onclick = () => chatModal.classList.remove("hidden");
-document.getElementById("chat-close").onclick = () => chatModal.classList.add("hidden");
-document.querySelector(".chat-backdrop").onclick = () => chatModal.classList.add("hidden");
-
-const chatMessages = document.getElementById("chat-messages");
-chatMessages.innerHTML = `<div class="chat-msg bot">Hi! I'm the pipeline agent — ingest, validate, deduplicate, prioritize.</div>`;
-
-document.getElementById("chat-form").onsubmit = async (e) => {
-  e.preventDefault();
-  const input = document.getElementById("chat-input");
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = "";
-  chatMessages.innerHTML += `<div class="chat-msg user">${esc(text)}</div>`;
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  try {
-    const r = await api("/api/v1/chat", {
-      method: "POST",
-      body: JSON.stringify({ message: text, alert_id: state.selectedId }),
-    });
-    chatMessages.innerHTML += `<div class="chat-msg bot">${esc(r.reply)}</div>`;
-  } catch (err) {
-    chatMessages.innerHTML += `<div class="chat-msg bot">Error: ${esc(err.message)}</div>`;
-  }
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-};
 
 document.getElementById("btn-refresh").onclick = refresh;
 

@@ -149,7 +149,7 @@ export function TriggerPage() {
   };
 
   return (
-    <AppShell subtitle="Agent-driven event generation — no JSON files" showControls>
+    <AppShell subtitle="Agent-driven event generation" showControls>
       <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
         <LoadingOverlay show={generating && !streaming} label="Agent generating alert…" />
 
@@ -175,7 +175,7 @@ export function TriggerPage() {
                 <span className="text-sm font-medium">Alert Generator Agent</span>
               </div>
               <p className="text-xs text-slate-400">
-                LLM agent creates realistic monitoring events and ingests them — no static JSON catalog.
+                LLM agent creates realistic monitoring events and ingests them through the pipeline.
               </p>
               <input
                 value={hint}

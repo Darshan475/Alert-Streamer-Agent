@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trigger alerts via the agent API — no static JSON files."""
+"""Trigger alerts via the agent API."""
 
 import argparse
 import asyncio

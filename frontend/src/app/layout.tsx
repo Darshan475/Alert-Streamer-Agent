@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Alert Streamer | Real-Time Incident Monitor",
-  description: "Trigger monitoring events and validate alerts with LLM-powered investigation",
+  description: "Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
 };
 
 export default function RootLayout({

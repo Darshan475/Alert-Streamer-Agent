@@ -1,4 +1,4 @@
-"""Seed demo alerts on startup using the alert generator agent — no JSON files."""
+"""Seed demo alerts on startup using the alert generator agent."""
 
 import asyncio
 import logging

@@ -1,8 +1,7 @@
-"""LangGraph agent that generates realistic monitoring alerts — no JSON files."""
+"""LangGraph agent that generates realistic monitoring alerts."""
 
 import json
 import logging
-import random
 from datetime import UTC, datetime
 from typing import TypedDict
 
@@ -12,16 +11,6 @@ from app.models.schemas import AlertIngest, AlertSeverity
 from app.services.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
-
-SERVICES = [
-    "api-gateway",
-    "payment-service",
-    "user-auth",
-    "order-processor",
-    "notification-hub",
-    "analytics-pipeline",
-]
-REGIONS = ["us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1"]
 
 GENERATOR_SYSTEM = """You are an SRE simulation agent that generates realistic production monitoring alerts.
 Respond ONLY with valid JSON (no markdown):
@@ -55,6 +44,8 @@ class GeneratorState(TypedDict):
 
 class AlertGeneratorAgent:
     """Agent-driven alert generation for auto-trigger streaming."""
+
+    GENERATE_RETRIES = 3
 
     def __init__(self, llm: LLMClient) -> None:
         self._llm = llm
@@ -98,41 +89,51 @@ class AlertGeneratorAgent:
         hint: str | None = None,
         recent_titles: list[str] | None = None,
     ) -> AlertIngest:
-        last_data: dict = {}
-        for attempt in range(2):
-            initial: GeneratorState = {
-                "hint": hint or ("Generate a unique production incident alert." if attempt else ""),
-                "recent": "\n".join(f"- {t}" for t in (recent_titles or [])[-8:]),
-                "raw": "",
-                "result": None,
-            }
-            final = await self._graph.ainvoke(initial)
-            data = final.get("result") or {}
-            last_data = data
-            title = data.get("title")
-            if title and title not in (recent_titles or []):
-                return self._to_ingest(data)
-        if last_data.get("title"):
-            return self._to_ingest(last_data)
-        raise RuntimeError("Alert generator agent could not produce a valid alert — check LLM API key.")
+        last_error: Exception | None = None
+        recent = "\n".join(f"- {t}" for t in (recent_titles or [])[-8:])
+
+        for attempt in range(self.GENERATE_RETRIES):
+            try:
+                initial: GeneratorState = {
+                    "hint": hint or "Generate a unique production incident alert.",
+                    "recent": recent,
+                    "raw": "",
+                    "result": None,
+                }
+                final = await self._graph.ainvoke(initial)
+                data = final.get("result") or {}
+                title = data.get("title")
+                if title and title not in (recent_titles or []):
+                    return self._to_ingest(data)
+                raise ValueError("Generator agent returned duplicate or empty title")
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Alert generator attempt %d failed: %s", attempt + 1, exc)
+
+        raise RuntimeError(
+            "Alert generator agent could not produce a valid alert — check LLM API key."
+        ) from last_error
 
     def _to_ingest(self, data: dict) -> AlertIngest:
-        if not data.get("title"):
-            raise ValueError("Agent did not produce a valid alert title")
+        required = ("title", "description", "severity", "service", "environment", "source", "alert_type")
+        missing = [field for field in required if not data.get(field)]
+        if missing:
+            raise ValueError(f"Generator agent missing fields: {', '.join(missing)}")
+
         return AlertIngest(
-            source=data.get("source", "prometheus"),
-            alert_type=data.get("alert_type", "incident"),
+            source=data["source"],
+            alert_type=data["alert_type"],
             title=data["title"],
-            description=data.get("description", data["title"]),
-            severity=AlertSeverity(data.get("severity", "medium")),
-            service=data.get("service", random.choice(SERVICES)),
-            environment=data.get("environment", "production"),
+            description=data["description"],
+            severity=AlertSeverity(data["severity"]),
+            service=data["service"],
+            environment=data["environment"],
             metric_value=data.get("metric_value"),
             threshold=data.get("threshold"),
             hostname=data.get("hostname"),
             namespace=data.get("namespace"),
             pod_name=data.get("pod_name"),
-            region=data.get("region", random.choice(REGIONS)),
+            region=data.get("region") or "us-east-1",
             tags=data.get("tags") or ["agent-generated"],
             metadata={**(data.get("metadata") or {}), "generated_by": "alert_generator_agent"},
             timestamp=datetime.now(UTC),

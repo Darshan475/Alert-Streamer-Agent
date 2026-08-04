@@ -1,6 +1,5 @@
-"""Multi-provider LLM client — free OpenRouter/Groq for testing, NVIDIA for production."""
+"""Multi-provider LLM client for agent pipeline and generator."""
 
-import json
 import logging
 import re
 from typing import Any
@@ -10,6 +9,10 @@ import httpx
 from app.config import LLMProvider, Settings
 
 logger = logging.getLogger(__name__)
+
+
+class LLMError(RuntimeError):
+    """Raised when the LLM provider is unavailable or returns an error."""
 
 
 class LLMClient:
@@ -66,7 +69,7 @@ class LLMClient:
         json_mode: bool = False,
     ) -> str:
         if self.provider == "offline" or not self.is_configured:
-            return self._fallback_response(messages)
+            raise LLMError(f"LLM not configured. {self._key_hint()}")
 
         headers: dict[str, str] = {
             "Authorization": f"Bearer {self._settings.api_key_for(self.provider)}",
@@ -104,10 +107,12 @@ class LLMClient:
         except httpx.HTTPStatusError as exc:
             detail = exc.response.text[:300]
             logger.error("LLM HTTP error [%s]: %s", self.provider, detail)
-            return self._fallback_response(messages, error=self._format_http_error(exc, detail))
+            raise LLMError(self._format_http_error(exc, detail)) from exc
+        except LLMError:
+            raise
         except Exception as exc:
             logger.exception("LLM request failed [%s]", self.provider)
-            return self._fallback_response(messages, error=str(exc))
+            raise LLMError(f"LLM request failed ({self.provider}): {exc}") from exc
 
     def _strip_thinking_tags(self, text: str) -> str:
         """Remove reasoning/thinking blocks from model output."""
@@ -125,8 +130,8 @@ class LLMClient:
         code = exc.response.status_code
         if code == 429:
             return (
-                "Provider rate limit exceeded (HTTP 429). Using offline fallback — "
-                "switch provider in the dashboard or add a key for OpenRouter/Groq."
+                "Provider rate limit exceeded (HTTP 429). "
+                "Switch provider in the dashboard or add a key for OpenRouter/Groq."
             )
         if self.provider == "gemini" and code in (401, 403):
             return (
@@ -150,37 +155,6 @@ class LLMClient:
             )
         return str(exc)
 
-    def _fallback_response(self, messages: list[dict[str, str]], error: str | None = None) -> str:
-        """Rule-based fallback when no API key or provider call fails."""
-        user_msg = next((m["content"] for m in reversed(messages) if m["role"] == "user"), "")
-
-        if "investigate" in user_msg.lower() or "root cause" in user_msg.lower() or json_mode_hint(user_msg):
-            return json.dumps(
-                {
-                    "root_cause": "Simulated: Resource exhaustion or dependency failure (offline fallback)",
-                    "impact_assessment": "Service degradation possible; verify metrics and recent deployments.",
-                    "recommendations": [
-                        "Check recent deployments and rollback if needed",
-                        "Inspect pod logs and resource utilization",
-                        "Verify upstream dependencies and connection pools",
-                        "Scale replicas if sustained load spike detected",
-                    ],
-                    "urgency_score": 7,
-                    "estimated_resolution_minutes": 30,
-                    "related_runbooks": ["runbook/incident-response", "runbook/scaling"],
-                }
-            )
-
-        hint = self._key_hint()
-        if error:
-            if "429" in error or "rate limit" in error.lower():
-                return self._offline_chat_reply(user_msg, quota_exceeded=True)
-            return f"LLM call failed ({self.provider}): {error[:200]}. {hint}"
-        return (
-            f"No LLM API key configured. {self._key_hint()} "
-            "Alerts still ingest via the pipeline agent — chat runs in offline tool mode."
-        )
-
     def _key_hint(self) -> str:
         if self.provider == "gemini":
             return "Set GEMINI_API_KEY in backend/.env (aistudio.google.com/apikey)."
@@ -188,36 +162,3 @@ class LLMClient:
             f"Set LLM_API_KEY in backend/.env (provider: {self.provider}). "
             "Free keys: aistudio.google.com/apikey, openrouter.ai, or console.groq.com"
         )
-
-    def _offline_chat_reply(self, user_msg: str, *, quota_exceeded: bool = False) -> str:
-        """Rule-based copilot when the LLM provider is unavailable."""
-        lower = user_msg.lower()
-        prefix = (
-            "Gemini quota exceeded — replying offline. "
-            if quota_exceeded
-            else "Offline mode — "
-        )
-
-        if any(k in lower for k in ("p1", "priority 1", "critical", "p2", "priority 2", "high")):
-            return (
-                f"{prefix}P1/P2 alerts are highest severity. The agent pipeline validates, "
-                "deduplicates, and prioritizes them automatically — no human review required."
-            )
-        if "pipeline" in lower or "ingest" in lower or "validate" in lower or "dedup" in lower:
-            return (
-                f"{prefix}The agent pipeline runs: Ingest → Validate → Deduplicate → Prioritize. "
-                "Use the chat agent to generate alerts or ask for stream stats."
-            )
-        if "alert" in lower or "data" in lower or "empty" in lower:
-            return (
-                f"{prefix}Alerts live in the in-memory store and reset on restart. "
-                "Demo alerts auto-seed on startup; run `python scripts/trigger_alerts.py` for more."
-            )
-        return (
-            f"{prefix}I run the alert pipeline agent: ingest, validate, deduplicate, prioritize. "
-            "Ask me to generate alerts, list prioritized items, or summarize the stream."
-        )
-
-
-def json_mode_hint(text: str) -> bool:
-    return "json" in text.lower() and "root_cause" in text.lower()

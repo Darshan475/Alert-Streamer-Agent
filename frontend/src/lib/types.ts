@@ -12,8 +12,6 @@ export type AlertStatus =
   | "rejected"
   | "escalated";
 
-export type HumanReviewDecision = "approve" | "reject" | "escalate";
-
 export type Team =
   | "platform"
   | "sre"
@@ -22,26 +20,6 @@ export type Team =
   | "payments"
   | "frontend"
   | "backend";
-
-export interface InvestigationResult {
-  root_cause: string;
-  impact_assessment: string;
-  recommendations: string[];
-  urgency_score: number;
-  estimated_resolution_minutes: number | null;
-  related_runbooks: string[];
-  investigated_at: string;
-}
-
-export interface HumanReview {
-  decision: HumanReviewDecision;
-  reviewer: string;
-  feedback: string;
-  reviewed_at: string;
-  override_recommendations: string[];
-  assigned_team?: Team | null;
-  assigned_to?: string;
-}
 
 export interface AlertRecord {
   id: string;
@@ -67,8 +45,6 @@ export interface AlertRecord {
   metadata: Record<string, unknown>;
   received_at: string;
   updated_at: string;
-  investigation?: InvestigationResult | null;
-  human_review?: HumanReview | null;
 }
 
 export interface AlertIngest {
@@ -107,30 +83,6 @@ export interface PipelineStats {
   by_status: Record<string, number>;
   by_priority: Record<string, number>;
   by_team: Record<string, number>;
-}
-
-export interface ChatResponse {
-  reply: string;
-  alert_context_used: boolean;
-  actions?: ChatAction[];
-  groups?: AlertGroup[];
-  tool_calls?: string[];
-  steps?: string[];
-}
-
-export interface ChatAction {
-  type: string;
-  alert_ids: string[];
-  label: string;
-}
-
-export interface AlertGroup {
-  group_key: string;
-  service: string;
-  environment: string;
-  count: number;
-  alert_ids: string[];
-  titles: string[];
 }
 
 export type LlmProviderId = "gemini" | "openrouter" | "groq" | "huggingface" | "nvidia" | "offline";

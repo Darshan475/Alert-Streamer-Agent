@@ -106,14 +106,6 @@ class AlertStore:
             by_priority[f"P{alert.priority}"] = by_priority.get(f"P{alert.priority}", 0) + 1
             by_team[alert.team.value] = by_team.get(alert.team.value, 0) + 1
 
-        needs_review = sum(
-            1
-            for a in active
-            if a.priority <= 2
-            and a.status in (AlertStatus.PENDING_REVIEW, AlertStatus.INVESTIGATING, AlertStatus.ESCALATED)
-        )
-        by_status["needs_review"] = needs_review
-
         return PipelineStats(
             total_alerts=len(active),
             by_status=by_status,

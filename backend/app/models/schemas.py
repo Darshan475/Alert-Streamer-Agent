@@ -102,43 +102,6 @@ class AlertRecord(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     received_at: datetime
     updated_at: datetime
-    investigation: "InvestigationResult | None" = None
-    human_review: "HumanReview | None" = None
-
-
-class InvestigationResult(BaseModel):
-    root_cause: str
-    impact_assessment: str
-    recommendations: list[str]
-    urgency_score: int = Field(ge=1, le=10)
-    estimated_resolution_minutes: int | None = None
-    related_runbooks: list[str] = Field(default_factory=list)
-    investigated_at: datetime
-
-
-class HumanReviewDecision(str, Enum):
-    APPROVE = "approve"
-    REJECT = "reject"
-    ESCALATE = "escalate"
-
-
-class HumanReview(BaseModel):
-    decision: HumanReviewDecision
-    reviewer: str
-    feedback: str = ""
-    reviewed_at: datetime
-    override_recommendations: list[str] = Field(default_factory=list)
-    assigned_team: Team | None = None
-    assigned_to: str = ""
-
-
-class HumanReviewRequest(BaseModel):
-    decision: HumanReviewDecision
-    reviewer: str = Field(default="on-call-engineer", min_length=1, max_length=128)
-    feedback: str = Field(default="", max_length=4096)
-    override_recommendations: list[str] = Field(default_factory=list)
-    assigned_team: Team | None = None
-    assigned_to: str = Field(default="", max_length=128)
 
 
 class AlertIngestResponse(BaseModel):
@@ -152,25 +115,6 @@ class AlertIngestResponse(BaseModel):
 class AlertListResponse(BaseModel):
     total: int
     items: list[AlertRecord]
-
-
-class ChatMessage(BaseModel):
-    role: str = Field(..., pattern="^(user|assistant)$")
-    content: str = Field(..., min_length=1, max_length=8000)
-
-
-class ChatRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=4000)
-    alert_id: UUID | None = None
-
-
-class ChatResponse(BaseModel):
-    reply: str
-    alert_context_used: bool = False
-    actions: list[dict] = Field(default_factory=list)
-    groups: list[dict] = Field(default_factory=list)
-    tool_calls: list[str] = Field(default_factory=list)
-    steps: list[str] = Field(default_factory=list)
 
 
 class PipelineStats(BaseModel):

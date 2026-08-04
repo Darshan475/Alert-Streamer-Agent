@@ -10,12 +10,11 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.api import agents, alerts, chat, llm
+from app.api import agents, alerts, llm
 from app.config import DEFAULT_LLM_PROVIDER, DEFAULT_NEMOTRON_MODEL, get_settings
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
-from app.services.chat_agent import ChatAgent
 from app.services.llm_client import LLMClient
 from app.services.pipeline_agent import PipelineAgent
 
@@ -33,13 +32,6 @@ dedup_store = DedupStore(ttl_seconds=settings.dedup_ttl_seconds)
 pipeline_agent = PipelineAgent(llm_client)
 alert_pipeline = AlertPipeline(dedup_store, pipeline_agent=pipeline_agent)
 alert_generator = AlertGeneratorAgent(llm_client)
-
-chat_agent = ChatAgent(
-    llm_client,
-    alert_store,
-    alert_generator,
-    alert_pipeline,
-)
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -63,7 +55,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.3.0",
+    version="2.4.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -78,7 +70,6 @@ app.add_middleware(
 )
 
 app.include_router(alerts.router, prefix="/api/v1")
-app.include_router(chat.router, prefix="/api/v1")
 app.include_router(llm.router, prefix="/api/v1")
 app.include_router(agents.router, prefix="/api/v1")
 
@@ -92,11 +83,7 @@ async def health():
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
         "pipeline": "ingest → validate → deduplicate → prioritize",
-        "agents": [
-            "pipeline",
-            "generator",
-            "chat",
-        ],
+        "agents": ["pipeline", "generator"],
     }
 
 

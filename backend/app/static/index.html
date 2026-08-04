@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alert Streamer | Incident Dashboard</title>
+  <title>Alert Streamer | Pipeline Dashboard</title>
   <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
@@ -13,7 +13,7 @@
         <div class="brand-icon">📡</div>
         <div>
           <h1>Alert Streamer</h1>
-          <p>LLM investigation · Human-in-the-loop · FastAPI</p>
+          <p>Agent pipeline · Ingest · Validate · Dedup · Prioritize</p>
         </div>
       </div>
       <button type="button" id="btn-refresh" class="btn-secondary">↻ Refresh</button>
@@ -38,31 +38,14 @@
         <div id="alert-list" class="alert-list"></div>
       </div>
       <div class="col-detail">
-        <h2 class="section-title">Investigation &amp; Human Review</h2>
+        <h2 class="section-title">Pipeline Details</h2>
         <div id="alert-detail" class="alert-detail empty">
-          <p>Select an alert to review LLM investigation</p>
-          <p class="muted">P1/P2 require approval · P3+ auto-resolve</p>
+          <p>Select an alert to view pipeline stages</p>
+          <p class="muted">Ingest → Validate → Deduplicate → Prioritize</p>
         </div>
       </div>
     </div>
   </main>
-
-  <button type="button" id="chat-fab" class="chat-fab" title="Open assistant">💬</button>
-
-  <div id="chat-modal" class="chat-modal hidden">
-    <div class="chat-backdrop"></div>
-    <div class="chat-panel">
-      <div class="chat-header">
-        <strong>Alert Assistant</strong>
-        <button type="button" id="chat-close" class="btn-icon">✕</button>
-      </div>
-      <div id="chat-messages" class="chat-messages"></div>
-      <form id="chat-form" class="chat-form">
-        <input id="chat-input" type="text" placeholder="Ask about alerts or human review…" autocomplete="off" />
-        <button type="submit">Send</button>
-      </form>
-    </div>
-  </div>
 
   <div id="toast" class="toast hidden"></div>
 

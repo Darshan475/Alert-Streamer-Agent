@@ -45,7 +45,7 @@ async def generate_alert(
     pipeline=Depends(get_pipeline),
     store=Depends(get_store),
 ) -> GenerateAlertResponse:
-    """Agent generates a realistic alert and ingests it — no JSON files."""
+    """Agent generates a realistic alert and ingests it through the pipeline."""
     recent_items, _ = await store.list_alerts(limit=10)
     alert = await generator.generate(
         hint=body.hint,

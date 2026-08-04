@@ -59,7 +59,6 @@ export function AlertsPage() {
     <AppShell
       subtitle="Agent Pipeline — Ingest · Validate · Dedup · Prioritize"
       live
-      chatAlertId={selectedId}
       onRefresh={silentRefresh}
       onLlmChanged={(message) => {
         void mutateHealth();

@@ -6,9 +6,6 @@ from app.models.schemas import (
     AlertRecord,
     AlertSeverity,
     AlertStatus,
-    ChatRequest,
-    ChatResponse,
-    InvestigationResult,
     PipelineStats,
     Team,
 )
@@ -21,9 +18,6 @@ __all__ = [
     "AlertRecord",
     "AlertSeverity",
     "AlertStatus",
-    "ChatRequest",
-    "ChatResponse",
-    "InvestigationResult",
     "PipelineStats",
     "Team",
 ]
