@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.api import agents, alerts, llm
-from app.config import DEFAULT_LLM_PROVIDER, DEFAULT_NEMOTRON_MODEL, get_settings
+from app.config import DEFAULT_LLM_PROVIDER, get_settings
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
@@ -25,8 +25,9 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 settings = get_settings()
 llm_client = LLMClient(settings)
-llm_client.set_provider(DEFAULT_LLM_PROVIDER)
-llm_client.set_model(DEFAULT_NEMOTRON_MODEL)
+llm_client.set_provider(settings.llm_provider or DEFAULT_LLM_PROVIDER)
+if settings.llm_model:
+    llm_client.set_model(settings.llm_model)
 alert_store = AlertStore()
 dedup_store = DedupStore(ttl_seconds=settings.dedup_ttl_seconds)
 pipeline_agent = PipelineAgent(llm_client)
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.5.0",
+    version="2.5.1",
     lifespan=lifespan,
 )
 app.state.limiter = limiter

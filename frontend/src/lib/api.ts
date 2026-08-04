@@ -12,6 +12,15 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text();
+    try {
+      const body = JSON.parse(text) as { detail?: string | { msg?: string }[] };
+      if (typeof body.detail === "string") throw new Error(body.detail);
+      if (Array.isArray(body.detail) && body.detail[0]?.msg) {
+        throw new Error(body.detail[0].msg);
+      }
+    } catch (parseErr) {
+      if (parseErr instanceof Error && parseErr.message !== text) throw parseErr;
+    }
     throw new Error(text || `Request failed: ${res.status}`);
   }
   return res.json();

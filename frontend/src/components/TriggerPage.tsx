@@ -105,10 +105,21 @@ export function TriggerPage() {
         pushEvent(res.alert, res.ingest);
         return res;
       } catch (err) {
-        setToast({
-          message: err instanceof Error ? err.message : "Agent generation failed",
-          type: "error",
-        });
+        const message = err instanceof Error ? err.message : "Agent generation failed";
+        setToast({ message, type: "error" });
+        pushEvent(
+          {
+            source: "agent",
+            alert_type: "generation_error",
+            title: scenarioHint || hint || "Alert generation failed",
+            description: message,
+            severity: "high",
+            service: "pipeline",
+            environment: "production",
+          },
+          null,
+          message
+        );
         return null;
       } finally {
         setGenerating(false);

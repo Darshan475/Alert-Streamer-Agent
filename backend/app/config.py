@@ -5,7 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LLMProvider = Literal["gemini", "openrouter", "groq", "huggingface", "nvidia", "offline"]
 
-# Provider defaults — OpenRouter + Nemotron is the default
+# Provider defaults — OpenRouter + gpt-4o-mini (widely available on OpenRouter free tier)
+DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 DEFAULT_NEMOTRON_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct"
 
 PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
@@ -15,7 +16,7 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
-        "model": DEFAULT_NEMOTRON_MODEL,
+        "model": DEFAULT_OPENROUTER_MODEL,
     },
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
@@ -49,10 +50,10 @@ PLACEHOLDER_KEYS = frozenset(
 DEFAULT_LLM_PROVIDER: LLMProvider = "openrouter"
 
 OPENROUTER_MODELS: list[str] = [
+    DEFAULT_OPENROUTER_MODEL,
+    "openai/gpt-4o",
     DEFAULT_NEMOTRON_MODEL,
     "nvidia/nemotron-4-340b-instruct",
-    "openai/gpt-4o-mini",
-    "openai/gpt-4o",
 ]
 
 LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
@@ -102,7 +103,7 @@ class Settings(BaseSettings):
     llm_provider: LLMProvider = DEFAULT_LLM_PROVIDER
     llm_api_key: str = ""
     llm_base_url: str = ""
-    llm_model: str = DEFAULT_NEMOTRON_MODEL
+    llm_model: str = DEFAULT_OPENROUTER_MODEL
     gemini_api_key: str = ""
     google_api_key: str = ""  # alias for GEMINI_API_KEY
     hf_token: str = ""  # HF_TOKEN — alternative to LLM_API_KEY for Hugging Face
@@ -123,7 +124,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./alert_streamer.db"
 
     dedup_ttl_seconds: int = 3600
-    llm_max_tokens: int = 4096
+    llm_max_tokens: int = 1024
     llm_temperature: float = 0.3
     seed_demo_alerts: bool = True
     openrouter_site_url: str = "https://alert-streamer-frontend.vercel.app"

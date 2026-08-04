@@ -71,6 +71,7 @@ class AlertGeneratorAgent:
             ],
             json_mode=True,
             temperature=0.85,
+            max_tokens=800,
         )
         return {**state, "raw": raw}
 

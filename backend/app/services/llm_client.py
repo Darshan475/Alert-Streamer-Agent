@@ -133,6 +133,11 @@ class LLMClient:
                 "Provider rate limit exceeded (HTTP 429). "
                 "Switch provider in the dashboard or add a key for OpenRouter/Groq."
             )
+        if code == 402:
+            return (
+                "OpenRouter credits exhausted (HTTP 402). Add credits at openrouter.ai/settings/credits "
+                "or switch to Gemini/Groq in the LLM dropdown."
+            )
         if self.provider == "gemini" and code in (401, 403):
             return (
                 f"HTTP {code}: Invalid Gemini API key. "

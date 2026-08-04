@@ -97,6 +97,7 @@ class PipelineAgent:
                     ],
                     json_mode=True,
                     temperature=0.15,
+                    max_tokens=600,
                 )
                 parsed = json.loads(raw)
                 if parsed.get("stage") == stage:
@@ -163,11 +164,17 @@ class PipelineAgent:
 
     @staticmethod
     def _parse_category(value: str) -> AlertCategory:
-        return AlertCategory(value.lower())
+        try:
+            return AlertCategory(value.lower())
+        except ValueError:
+            return AlertCategory.OTHER
 
     @staticmethod
     def _parse_team(value: str) -> Team:
-        return Team(value.lower())
+        try:
+            return Team(value.lower())
+        except ValueError:
+            return Team.SRE
 
     async def run(self, alert: AlertIngest, open_alerts: list[dict] | None = None) -> PipelineAgentResult:
         initial: PipelineState = {
