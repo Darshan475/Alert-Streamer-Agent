@@ -17,8 +17,8 @@ export function StatsCards({ stats, alertCount }: Props) {
       color: "text-cyan-400",
     },
     {
-      label: "Investigating",
-      value: stats?.by_status?.investigating ?? 0,
+      label: "Prioritized",
+      value: stats?.by_status?.prioritized ?? 0,
       icon: AlertTriangle,
       color: "text-amber-400",
     },
