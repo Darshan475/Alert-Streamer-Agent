@@ -17,8 +17,9 @@ Deploy as **two Vercel projects** from the same GitHub repo.
 3. Environment variables:
 
    ```
-   GEMINI_API_KEY=your_key_from_aistudio.google.com/apikey
-   LLM_PROVIDER=gemini
+   LLM_PROVIDER=openrouter
+   LLM_API_KEY=your_key_from_openrouter.ai/keys
+   LLM_MODEL=nvidia/llama-3.1-nemotron-70b-instruct
    SEED_DEMO_ALERTS=true
    CORS_ORIGINS=https://alert-streamer-frontend.vercel.app,http://localhost:3000
    ```
@@ -76,8 +77,9 @@ vercel deploy --prod
 4. Add environment variables:
 
    ```
-   GEMINI_API_KEY=your_key_from_aistudio.google.com/apikey
-   LLM_PROVIDER=gemini
+   LLM_PROVIDER=openrouter
+   LLM_API_KEY=your_key_from_openrouter.ai/keys
+   LLM_MODEL=nvidia/llama-3.1-nemotron-70b-instruct
    CORS_ORIGINS=https://your-frontend.vercel.app
    ```
 
@@ -108,7 +110,9 @@ Open **http://localhost:8000**
 | Variable | Required | Example |
 |----------|----------|---------|
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | For live LLM (default) | from [AI Studio](https://aistudio.google.com/apikey) |
-| `LLM_PROVIDER` | Optional | `gemini` (default) |
+| `LLM_PROVIDER` | Optional | `openrouter` (default) |
+| `LLM_MODEL` | Optional | `nvidia/llama-3.1-nemotron-70b-instruct` (default) |
+| `LLM_API_KEY` | Recommended | OpenRouter API key for Nemotron |
 | `LLM_API_KEY` / `HF_TOKEN` | Other providers | `sk-or-v1-...` or `hf_...` |
 | `ALERT_STREAMER_API_KEY` | Yes | set in Vercel/Render dashboard |
 | `CORS_ORIGINS` | Yes for split deploy | `https://your-frontend.vercel.app,http://localhost:3000` |

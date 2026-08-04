@@ -5,7 +5,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LLMProvider = Literal["gemini", "openrouter", "groq", "huggingface", "nvidia", "offline"]
 
-# Provider defaults — Gemini is the default (Google AI Studio free tier)
+# Provider defaults — OpenRouter + Nemotron is the default
+DEFAULT_NEMOTRON_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct"
+
 PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
@@ -13,7 +15,7 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
-        "model": "nvidia/llama-3.1-nemotron-70b-instruct",
+        "model": DEFAULT_NEMOTRON_MODEL,
     },
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
@@ -47,7 +49,7 @@ PLACEHOLDER_KEYS = frozenset(
 DEFAULT_LLM_PROVIDER: LLMProvider = "openrouter"
 
 OPENROUTER_MODELS: list[str] = [
-    "nvidia/llama-3.1-nemotron-70b-instruct",
+    DEFAULT_NEMOTRON_MODEL,
     "nvidia/nemotron-4-340b-instruct",
     "openai/gpt-4o-mini",
     "openai/gpt-4o",
@@ -61,7 +63,7 @@ LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
         "signup_url": "https://aistudio.google.com/apikey",
     },
     "openrouter": {
-        "label": "OpenRouter",
+        "label": "OpenRouter · Nemotron",
         "free": True,
         "key_hint": "LLM_API_KEY from openrouter.ai/keys",
         "signup_url": "https://openrouter.ai/keys",
@@ -96,11 +98,11 @@ LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM — default Google Gemini; override via dashboard or LLM_PROVIDER env
+    # LLM — default OpenRouter + Nemotron; override via dashboard or env
     llm_provider: LLMProvider = DEFAULT_LLM_PROVIDER
     llm_api_key: str = ""
     llm_base_url: str = ""
-    llm_model: str = ""
+    llm_model: str = DEFAULT_NEMOTRON_MODEL
     gemini_api_key: str = ""
     google_api_key: str = ""  # alias for GEMINI_API_KEY
     hf_token: str = ""  # HF_TOKEN — alternative to LLM_API_KEY for Hugging Face

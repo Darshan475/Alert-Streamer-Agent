@@ -11,7 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.api import agents, alerts, chat, llm
-from app.config import get_settings
+from app.config import DEFAULT_LLM_PROVIDER, DEFAULT_NEMOTRON_MODEL, get_settings
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
@@ -27,9 +27,11 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 settings = get_settings()
+llm_client = LLMClient(settings)
+llm_client.set_provider(DEFAULT_LLM_PROVIDER)
+llm_client.set_model(DEFAULT_NEMOTRON_MODEL)
 alert_store = AlertStore()
 dedup_store = DedupStore(ttl_seconds=settings.dedup_ttl_seconds)
-llm_client = LLMClient(settings)
 pipeline_agent = PipelineAgent(llm_client)
 alert_pipeline = AlertPipeline(dedup_store, pipeline_agent=pipeline_agent)
 investigation_agent = InvestigationAgent(llm_client)
