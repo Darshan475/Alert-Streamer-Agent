@@ -178,95 +178,99 @@ export function TriggerPage() {
           <MetricCard label="Agent Gen" value={String(generated.length)} icon={Bot} color="text-purple-400" />
         </div>
 
-        <div className="shrink-0 w-full max-w-md">
-          <div className="rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-3 space-y-2">
-            <div className="flex items-center gap-2 text-violet-300">
-              <Sparkles className="h-4 w-4 shrink-0" />
-              <span className="text-sm font-medium">Alert Generator</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
-              Count
-              <select
-                value={streamCount}
-                onChange={(e) => setStreamCount(Number(e.target.value))}
-                disabled={streaming}
-                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
-              >
-                {[3, 5, 8, 10].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
-              Delay
-              <select
-                value={delayMs}
-                onChange={(e) => setDelayMs(Number(e.target.value))}
-                disabled={streaming}
-                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
-              >
-                <option value={0}>Instant</option>
-                <option value={500}>500ms</option>
-                <option value={800}>800ms</option>
-                <option value={1500}>1.5s</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => void generateAndIngest()}
-              disabled={generating || streaming || backendOk === false}
-              className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
-            >
-              <Bot className="h-3 w-3" />
-              Generate One
-            </button>
-            {streaming ? (
-              <button
-                type="button"
-                onClick={stopStream}
-                className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300"
-              >
-                <Square className="h-3 w-3" />
-                Stop
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => void autoStream()}
-                disabled={backendOk === false}
-                className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
-              >
-                <Play className="h-3 w-3" />
-                Auto Stream
-              </button>
-            )}
-            </div>
-          </div>
-        </div>
-
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
-          <div className="flex flex-col min-h-[220px] lg:min-h-0 gap-2">
-            <h2 className="shrink-0 text-sm font-medium text-slate-400 uppercase tracking-wider">
-              Generated Preview ({generated.length})
-            </h2>
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 scroll-panel space-y-2">
-              {generated.length === 0 ? (
-                <p className="text-sm text-slate-500 text-center py-10 border border-dashed border-slate-700 rounded-xl">
-                  No alerts yet — click Generate One
-                </p>
-              ) : (
-                generated.map((alert, i) => {
-                  const row = alertRowMeta(alert);
-                  return (
-                    <GeneratedPreviewCard key={`${row.id}-${i}`} alert={alert} row={row} />
-                  );
-                })
-              )}
+          {/* Left: Generator + Preview */}
+          <div className="flex flex-col min-h-[280px] lg:min-h-0 gap-3">
+            <div className="shrink-0 w-full rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-2 text-violet-300 shrink-0">
+                  <Sparkles className="h-4 w-4" />
+                  <span className="text-sm font-medium">Alert Generator</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                    Count
+                    <select
+                      value={streamCount}
+                      onChange={(e) => setStreamCount(Number(e.target.value))}
+                      disabled={streaming}
+                      className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+                    >
+                      {[3, 5, 8, 10].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                    Delay
+                    <select
+                      value={delayMs}
+                      onChange={(e) => setDelayMs(Number(e.target.value))}
+                      disabled={streaming}
+                      className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+                    >
+                      <option value={0}>Instant</option>
+                      <option value={500}>500ms</option>
+                      <option value={800}>800ms</option>
+                      <option value={1500}>1.5s</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void generateAndIngest()}
+                    disabled={generating || streaming || backendOk === false}
+                    className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
+                  >
+                    <Bot className="h-3 w-3" />
+                    Generate One
+                  </button>
+                  {streaming ? (
+                    <button
+                      type="button"
+                      onClick={stopStream}
+                      className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300"
+                    >
+                      <Square className="h-3 w-3" />
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void autoStream()}
+                      disabled={backendOk === false}
+                      className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
+                    >
+                      <Play className="h-3 w-3" />
+                      Auto Stream
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col flex-1 min-h-0 gap-2">
+              <h2 className="shrink-0 text-sm font-medium text-slate-400 uppercase tracking-wider">
+                Generated Preview ({generated.length})
+              </h2>
+              <div className="flex-1 min-h-[160px] lg:min-h-0 overflow-y-auto pr-1 scroll-panel space-y-2">
+                {generated.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-10 h-full flex items-center justify-center border border-dashed border-slate-700 rounded-xl">
+                    No alerts yet — click Generate One
+                  </p>
+                ) : (
+                  generated.map((alert, i) => {
+                    const row = alertRowMeta(alert);
+                    return (
+                      <GeneratedPreviewCard key={`${row.id}-${i}`} alert={alert} row={row} />
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col min-h-[220px] lg:min-h-0 gap-2">
+          {/* Right: Live Event Stream — full height */}
+          <div className="flex flex-col min-h-[280px] lg:min-h-0 gap-2">
             <div className="shrink-0 flex items-center justify-between gap-2">
               <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 Live Event Stream
@@ -283,11 +287,11 @@ export function TriggerPage() {
 
             <div
               ref={logRef}
-              className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#070a12] font-mono text-xs p-3 space-y-1 scroll-panel"
+              className="flex-1 min-h-[200px] lg:min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#070a12] font-mono text-xs p-3 space-y-1 scroll-panel"
             >
               {events.length === 0 ? (
-                <p className="text-slate-500 text-center py-10 text-sm">
-                  Click <span className="text-cyan-400">Generate One</span> to start
+                <p className="text-slate-500 text-center py-10 text-sm h-full flex items-center justify-center">
+                  Click <span className="text-cyan-400 mx-1">Generate One</span> to start
                 </p>
               ) : (
                 events.map((ev) => (
