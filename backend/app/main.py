@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.6.2",
+    version="2.6.3",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
