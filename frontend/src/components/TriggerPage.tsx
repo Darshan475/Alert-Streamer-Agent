@@ -181,14 +181,13 @@ export function TriggerPage() {
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           {/* Left: Generator + Preview */}
           <div className="flex flex-col min-h-[280px] lg:min-h-0 gap-3">
-            <div className="shrink-0 w-full rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-3 sm:p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="shrink-0 w-full rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 px-3 py-2.5 sm:px-4">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <div className="flex items-center gap-2 text-violet-300 shrink-0">
                   <Sparkles className="h-4 w-4" />
-                  <span className="text-sm font-medium">Alert Generator</span>
+                  <span className="text-sm font-medium whitespace-nowrap">Alert Generator</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                  <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
                     Count
                     <select
                       value={streamCount}
@@ -196,12 +195,12 @@ export function TriggerPage() {
                       disabled={streaming}
                       className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
                     >
-                      {[3, 5, 8, 10].map((n) => (
+                      {[7, 10,15].map((n) => (
                         <option key={n} value={n}>{n}</option>
                       ))}
                     </select>
                   </label>
-                  <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
                     Delay
                     <select
                       value={delayMs}
@@ -219,7 +218,7 @@ export function TriggerPage() {
                     type="button"
                     onClick={() => void generateAndIngest()}
                     disabled={generating || streaming || backendOk === false}
-                    className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40 shrink-0"
                   >
                     <Bot className="h-3 w-3" />
                     Generate One
@@ -244,7 +243,6 @@ export function TriggerPage() {
                       Auto Stream
                     </button>
                   )}
-                </div>
               </div>
             </div>
 
