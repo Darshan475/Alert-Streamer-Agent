@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { generateAgentAlert, getHealth, getStats, ingestRawAlert, API_BASE } from "@/lib/api";
+import { generateAgentAlert, getHealth, getStats, API_BASE } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
@@ -18,18 +18,7 @@ import {
   XCircle,
   ArrowRight,
   Radio,
-  Zap,
 } from "lucide-react";
-
-const DEMO_RAW_ALERT = {
-  "alert-id": "ALT-001",
-  service: "payment-api",
-  metric: "error-rate",
-  value: 22,
-  threshold: 5,
-  message: "High error-rate",
-  source: "CloudWatch",
-};
 
 interface StreamEvent {
   id: string;
@@ -41,6 +30,11 @@ interface StreamEvent {
   severity: string;
 }
 
+const FORMAT_EXAMPLES = [
+  "Warn: [P3][PSS BWS]LOW SQS MESSAGE VOLUME DETECTED_propertyupdate",
+  "Triggered: [P3][PSS BWS] /whgservices/loyalty/v4/member/promotionregistertoken 5xx error rate- Prod - Tally digitalpromosmiscservices-prd",
+];
+
 const severityColors: Record<string, string> = {
   critical: "text-red-400 bg-red-500/15 border-red-500/30",
   high: "text-orange-400 bg-orange-500/15 border-orange-500/30",
@@ -49,12 +43,22 @@ const severityColors: Record<string, string> = {
   info: "text-slate-400 bg-slate-500/15 border-slate-500/30",
 };
 
+function alertRowMeta(alert: AlertIngest) {
+  const meta = alert.metadata ?? {};
+  return {
+    id: String(meta.incident_id ?? "—"),
+    date: String(meta.opened_date ?? new Date().toLocaleDateString()),
+    priority: String(meta.priority_label ?? "3-Medium"),
+    platform: String(meta.platform ?? "Pss Bws"),
+    monitor: String(meta.monitor ?? alert.source ?? "Datadog"),
+  };
+}
+
 export function TriggerPage() {
   const [generated, setGenerated] = useState<AlertIngest[]>([]);
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [normalizing, setNormalizing] = useState(false);
   const [delayMs, setDelayMs] = useState(800);
   const [streamCount, setStreamCount] = useState(5);
   const [hint, setHint] = useState("");
@@ -88,7 +92,7 @@ export function TriggerPage() {
             : "rejected";
 
       setEvents((prev) => [
-        ...prev,
+        ...prev.slice(-49),
         {
           id: crypto.randomUUID(),
           ts: new Date(),
@@ -121,12 +125,12 @@ export function TriggerPage() {
         setToast({ message, type: "error" });
         pushEvent(
           {
-            source: "agent",
+            source: "datadog",
             alert_type: "generation_error",
             title: scenarioHint || hint || "Alert generation failed",
             description: message,
             severity: "high",
-            service: "pipeline",
+            service: "pss-bws",
             environment: "production",
           },
           null,
@@ -139,33 +143,6 @@ export function TriggerPage() {
     },
     [hint, pushEvent]
   );
-
-  const sendRawDemoAlert = useCallback(async () => {
-    setNormalizing(true);
-    try {
-      const res = await ingestRawAlert(DEMO_RAW_ALERT);
-      setGenerated((prev) => [res.normalized, ...prev].slice(0, 12));
-      pushEvent(res.normalized, res.ingest);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Raw ingest failed";
-      setToast({ message, type: "error" });
-      pushEvent(
-        {
-          source: "cloudwatch",
-          alert_type: "raw_ingest_error",
-          title: DEMO_RAW_ALERT.message,
-          description: message,
-          severity: "high",
-          service: DEMO_RAW_ALERT.service,
-          environment: "production",
-        },
-        null,
-        message
-      );
-    } finally {
-      setNormalizing(false);
-    }
-  }, [pushEvent]);
 
   const autoStream = useCallback(async () => {
     if (streaming || backendOk === false) return;
@@ -199,9 +176,9 @@ export function TriggerPage() {
   };
 
   return (
-    <AppShell subtitle="Agent-driven event generation" showControls>
+    <AppShell subtitle="PSS BWS · Datadog alert generation" showControls>
       <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-        <LoadingOverlay show={generating && !streaming && !normalizing} label="Agent working…" />
+        <LoadingOverlay show={generating && !streaming} label="Generating PSS BWS alert…" />
 
         <div className="shrink-0 grid grid-cols-2 lg:grid-cols-6 gap-3">
           <MetricCard
@@ -219,40 +196,26 @@ export function TriggerPage() {
 
         <div className="flex-1 min-h-0 grid lg:grid-cols-12 gap-4">
           <div className="lg:col-span-5 flex flex-col min-h-0 gap-3">
-            <div className="shrink-0 rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/5 to-emerald-500/5 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-cyan-300">
-                <Zap className="h-4 w-4" />
-                <span className="text-sm font-medium">Ingest Agent (Step 1)</span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Send a raw CloudWatch-style payload — the ingest agent normalizes it before validate → dedup → prioritize.
-              </p>
-              <pre className="rounded-lg border border-slate-800 bg-[#070a12] p-2 text-[10px] text-slate-500 overflow-x-auto">
-                {JSON.stringify(DEMO_RAW_ALERT, null, 2)}
-              </pre>
-              <button
-                type="button"
-                onClick={() => void sendRawDemoAlert()}
-                disabled={normalizing || streaming || backendOk === false}
-                className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
-              >
-                <Zap className="h-3 w-3" />
-                Send Raw Alert
-              </button>
-            </div>
-
             <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-4 space-y-3">
               <div className="flex items-center gap-2 text-violet-300">
                 <Sparkles className="h-4 w-4" />
                 <span className="text-sm font-medium">Alert Generator Agent</span>
               </div>
               <p className="text-xs text-slate-400">
-                LLM agent creates realistic monitoring events and ingests them through the pipeline.
+                Generates PSS BWS P3 alerts in Datadog incident format — validate → dedup → prioritize.
               </p>
+              <div className="rounded-lg border border-slate-800 bg-[#070a12] p-2 space-y-1">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide">Alert format</p>
+                {FORMAT_EXAMPLES.map((line) => (
+                  <p key={line} className="text-[10px] text-slate-400 font-mono leading-relaxed break-all">
+                    {line}
+                  </p>
+                ))}
+              </div>
               <input
                 value={hint}
                 onChange={(e) => setHint(e.target.value)}
-                placeholder="Optional scenario hint (e.g. payment outage, k8s node down…)"
+                placeholder="Optional hint (e.g. SQS volume, API 5xx on loyalty endpoint…)"
                 className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
               />
               <div className="flex flex-wrap items-center gap-2">
@@ -316,32 +279,38 @@ export function TriggerPage() {
             </div>
 
             <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-              Agent-Generated Preview
+              Generated Preview
             </h2>
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scroll-panel">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 scroll-panel">
               {generated.length === 0 ? (
                 <p className="text-xs text-slate-600 text-center py-8">
                   No alerts yet — click Generate One or Auto Stream
                 </p>
               ) : (
-                generated.map((alert, i) => (
-                  <div
-                    key={`${alert.title}-${i}`}
-                    className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                      <span
-                        className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase ${severityColors[alert.severity] ?? severityColors.info}`}
-                      >
-                        {alert.severity}
-                      </span>
-                      <span className="text-[10px] text-violet-400">agent</span>
-                      <span className="text-[10px] text-slate-500">{alert.service}</span>
-                    </div>
-                    <p className="text-sm font-medium text-white truncate">{alert.title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{alert.description}</p>
+                <div className="rounded-lg border border-slate-700/60 overflow-hidden">
+                  <div className="grid grid-cols-[4.5rem_4.5rem_5rem_1fr_4rem] gap-1 bg-slate-800/80 px-2 py-1.5 text-[9px] uppercase tracking-wide text-slate-500">
+                    <span>ID</span>
+                    <span>Date</span>
+                    <span>Priority</span>
+                    <span>Alert</span>
+                    <span>Tool</span>
                   </div>
-                ))
+                  {generated.map((alert, i) => {
+                    const row = alertRowMeta(alert);
+                    return (
+                      <div
+                        key={`${alert.title}-${i}`}
+                        className="grid grid-cols-[4.5rem_4.5rem_5rem_1fr_4rem] gap-1 border-t border-slate-800/60 px-2 py-2 text-[10px] hover:bg-slate-900/40"
+                      >
+                        <span className="text-cyan-400 font-mono">{row.id}</span>
+                        <span className="text-slate-400">{row.date}</span>
+                        <span className="text-amber-300 truncate">{row.priority}</span>
+                        <span className="text-slate-200 truncate" title={alert.title}>{alert.title}</span>
+                        <span className="text-slate-500 truncate">{row.monitor}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -367,8 +336,7 @@ export function TriggerPage() {
             >
               {events.length === 0 ? (
                 <p className="text-slate-600 text-center py-12">
-                  Agent will generate and ingest alerts autonomously — click{" "}
-                  <span className="text-cyan-500">Auto Stream</span>
+                  Click <span className="text-cyan-500">Generate One</span> to create a PSS BWS alert
                 </p>
               ) : (
                 events.map((ev) => (
@@ -398,7 +366,7 @@ export function TriggerPage() {
             </div>
 
             <p className="shrink-0 text-[10px] text-slate-600 truncate">
-              Agent pipeline: ingest → validate → deduplicate → prioritize · {API_BASE}/api/v1/alerts/stream
+              Pipeline: validate → deduplicate → prioritize · {API_BASE}/api/v1/agents/generate-alert
             </p>
           </div>
         </div>
