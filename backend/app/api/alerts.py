@@ -153,6 +153,14 @@ async def submit_human_review(
             detail=f"Cannot review alert in status '{alert.status.value}'",
         )
 
+    if payload.decision in (HumanReviewDecision.APPROVE, HumanReviewDecision.ESCALATE):
+        if not payload.assigned_to.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="assigned_to is required — assign the ticket to a team member before approving or escalating.",
+            )
+
+    assign_team = payload.assigned_team or alert.team
     now = datetime.now(UTC)
     review = HumanReview(
         decision=payload.decision,
@@ -160,8 +168,11 @@ async def submit_human_review(
         feedback=payload.feedback,
         reviewed_at=now,
         override_recommendations=payload.override_recommendations,
+        assigned_team=assign_team,
+        assigned_to=payload.assigned_to.strip(),
     )
     alert.human_review = review
+    alert.team = assign_team
     alert.updated_at = now
 
     if payload.decision == HumanReviewDecision.APPROVE:

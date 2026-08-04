@@ -55,7 +55,7 @@ class ChatService:
 
         stats = await self._store.stats()
         lines = [
-            f"Current alert stream ({total} active alerts):",
+            f"Current alert stream ({stats.total_alerts} active alerts):",
             f"- Total: {stats.total_alerts} | Needs review (P1/P2): {stats.by_status.get('needs_review', 0)}",
             f"- By status: {stats.by_status}",
             "",
@@ -88,6 +88,9 @@ Investigation:
 Human review: {hr.decision.value} by {hr.reviewer}
 Feedback: {hr.feedback or 'none'}
 """
+        if hr.assigned_to:
+            team_name = hr.assigned_team.value if hr.assigned_team else alert.team.value
+            hr_text += f"Assigned to: {hr.assigned_to} ({team_name} team)\n"
         return f"""Alert context:
 - ID: {alert.id}
 - Title: {alert.title}

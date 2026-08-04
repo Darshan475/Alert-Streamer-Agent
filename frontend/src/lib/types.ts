@@ -39,6 +39,8 @@ export interface HumanReview {
   feedback: string;
   reviewed_at: string;
   override_recommendations: string[];
+  assigned_team?: Team | null;
+  assigned_to?: string;
 }
 
 export interface AlertRecord {

@@ -128,6 +128,8 @@ class HumanReview(BaseModel):
     feedback: str = ""
     reviewed_at: datetime
     override_recommendations: list[str] = Field(default_factory=list)
+    assigned_team: Team | None = None
+    assigned_to: str = ""
 
 
 class HumanReviewRequest(BaseModel):
@@ -135,6 +137,8 @@ class HumanReviewRequest(BaseModel):
     reviewer: str = Field(default="on-call-engineer", min_length=1, max_length=128)
     feedback: str = Field(default="", max_length=4096)
     override_recommendations: list[str] = Field(default_factory=list)
+    assigned_team: Team | None = None
+    assigned_to: str = Field(default="", max_length=128)
 
 
 class AlertIngestResponse(BaseModel):

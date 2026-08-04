@@ -87,6 +87,8 @@ export async function submitHumanReview(
     reviewer?: string;
     feedback?: string;
     override_recommendations?: string[];
+    assigned_team?: import("./types").Team;
+    assigned_to?: string;
   }
 ): Promise<import("./types").AlertRecord> {
   return fetchJson(`/api/v1/alerts/${alertId}/human-review`, {

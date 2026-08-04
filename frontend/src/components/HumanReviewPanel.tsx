@@ -1,16 +1,12 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useEffect, useState } from "react";
 import { submitHumanReview } from "@/lib/api";
-import type { AlertRecord, HumanReviewDecision } from "@/lib/types";
-import { formatTime } from "@/lib/utils";
-import {
-  CheckCircle2,
-  XCircle,
-  ArrowUpCircle,
-  UserCheck,
-  Loader2,
-} from "lucide-react";
+import { TEAM_ASSIGNEES, suggestTeam } from "@/lib/assignees";
+import type { AlertRecord, HumanReviewDecision, Team } from "@/lib/types";
+import { formatTime, teamLabel } from "@/lib/utils";
+import { HumanReviewModal } from "./HumanReviewModal";
+import { Maximize2, UserCheck, Users } from "lucide-react";
 
 interface Props {
   alert: AlertRecord;
@@ -19,26 +15,61 @@ interface Props {
 }
 
 export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
+  const suggestedTeam = suggestTeam(alert.category, alert.team);
   const [feedback, setFeedback] = useState("");
   const [reviewer, setReviewer] = useState("on-call-engineer");
+  const [assignedTeam, setAssignedTeam] = useState<Team>(alert.team);
+  const [assignedTo, setAssignedTo] = useState("");
   const [submitting, setSubmitting] = useState<HumanReviewDecision | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const assigneeOptions = TEAM_ASSIGNEES[assignedTeam] ?? [];
+
+  useEffect(() => {
+    setAssignedTeam(alert.team);
+    setAssignedTo("");
+    setFeedback("");
+  }, [alert.id, alert.team]);
 
   const canReview =
     alert.status === "pending_review" ||
     alert.status === "investigating" ||
     alert.status === "escalated";
 
+  useEffect(() => {
+    if (canReview && (alert.status === "pending_review" || alert.status === "escalated")) {
+      setModalOpen(true);
+    } else {
+      setModalOpen(false);
+    }
+  }, [alert.id, alert.status, canReview]);
+
   async function handleDecision(decision: HumanReviewDecision) {
+    if (
+      (decision === "approve" || decision === "escalate") &&
+      !assignedTo.trim()
+    ) {
+      onToast("Assign the ticket to a team member before approving or escalating.", "error");
+      return;
+    }
+
     setSubmitting(decision);
     try {
       await submitHumanReview(alert.id, {
         decision,
         reviewer,
         feedback,
+        assigned_team: assignedTeam,
+        assigned_to: assignedTo.trim(),
       });
       const labels = { approve: "approved", reject: "rejected", escalate: "escalated" };
-      onToast(`Alert ${labels[decision]} by ${reviewer}`, "success");
+      const assignMsg =
+        decision !== "reject" && assignedTo
+          ? ` → assigned to ${assignedTo} (${teamLabel(assignedTeam)})`
+          : "";
+      onToast(`Alert ${labels[decision]} by ${reviewer}${assignMsg}`, "success");
       setFeedback("");
+      setModalOpen(false);
       onReviewComplete();
     } catch (err) {
       onToast(err instanceof Error ? err.message : "Review failed", "error");
@@ -71,6 +102,16 @@ export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
           {isAutoResolved ? "Resolved by" : "Reviewer:"}{" "}
           <span className="text-slate-200">{isAutoResolved ? "pipeline policy" : hr.reviewer}</span>
         </p>
+        {!isAutoResolved && hr.assigned_to && (
+          <p className="text-sm text-slate-400 flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-cyan-400" />
+            Assigned to{" "}
+            <span className="text-cyan-300">{hr.assigned_to}</span>
+            {hr.assigned_team && (
+              <span className="text-slate-500">· {teamLabel(hr.assigned_team)} team</span>
+            )}
+          </p>
+        )}
         {hr.feedback && (
           <p
             className={`text-sm text-slate-400 border-l-2 pl-3 ${
@@ -87,94 +128,46 @@ export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
   if (!canReview) return null;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-violet-500/5 p-3 space-y-3">
-      <div className="flex items-center gap-2">
-        <UserCheck className="h-4 w-4 text-amber-400" />
-        <span className="font-medium text-amber-200 text-sm">Human-in-the-Loop Review</span>
-        <span className="ml-auto text-xs text-amber-400/80 animate-pulse">Awaiting your decision</span>
+    <>
+      <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-violet-500/5 p-4">
+        <div className="flex items-start gap-3">
+          <UserCheck className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-amber-200 text-sm">Human Review Required</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {alert.investigation
+                ? "LLM investigation is complete. Open the full review to assign and decide."
+                : "Investigation in progress. You can open review to assign while waiting."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/20 transition-colors"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+            Open Review
+          </button>
+        </div>
       </div>
 
-      <p className="text-xs text-slate-400">
-        LLM investigation complete. P1/P2 alerts require your approval — approve to resolve, reject as false
-        positive, or escalate priority.
-      </p>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs text-slate-500 col-span-2">Reviewer</label>
-        <input
-          value={reviewer}
-          onChange={(e) => setReviewer(e.target.value)}
-          className="col-span-2 rounded-lg bg-slate-900/80 border border-slate-700 px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-amber-500/40"
-        />
-        <label className="text-xs text-slate-500 col-span-2">Feedback (optional)</label>
-        <textarea
-          value={feedback}
-          onChange={(e) => setFeedback(e.target.value)}
-          rows={2}
-          placeholder="Add notes for the team…"
-          className="col-span-2 rounded-lg bg-slate-900/80 border border-slate-700 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-500/40 resize-none"
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        <ActionBtn
-          label="Approve"
-          icon={CheckCircle2}
-          color="emerald"
-          loading={submitting === "approve"}
-          disabled={!!submitting}
-          onClick={() => handleDecision("approve")}
-        />
-        <ActionBtn
-          label="Reject"
-          icon={XCircle}
-          color="red"
-          loading={submitting === "reject"}
-          disabled={!!submitting}
-          onClick={() => handleDecision("reject")}
-        />
-        <ActionBtn
-          label="Escalate"
-          icon={ArrowUpCircle}
-          color="amber"
-          loading={submitting === "escalate"}
-          disabled={!!submitting}
-          onClick={() => handleDecision("escalate")}
-        />
-      </div>
-    </div>
-  );
-}
-
-function ActionBtn({
-  label,
-  icon: Icon,
-  color,
-  loading,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  color: "emerald" | "red" | "amber";
-  loading: boolean;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  const colors = {
-    emerald: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
-    red: "border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20",
-    amber: "border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20",
-  };
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`flex flex-1 min-w-[72px] items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-50 ${colors[color]}`}
-    >
-      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-      {label}
-    </button>
+      <HumanReviewModal
+        alert={alert}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        reviewer={reviewer}
+        onReviewerChange={setReviewer}
+        assignedTeam={assignedTeam}
+        onAssignedTeamChange={setAssignedTeam}
+        assignedTo={assignedTo}
+        onAssignedToChange={setAssignedTo}
+        feedback={feedback}
+        onFeedbackChange={setFeedback}
+        assigneeOptions={assigneeOptions}
+        suggestedTeam={suggestedTeam}
+        submitting={submitting}
+        onDecision={handleDecision}
+      />
+    </>
   );
 }
