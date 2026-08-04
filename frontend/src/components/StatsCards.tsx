@@ -1,15 +1,13 @@
 "use client";
 
 import type { PipelineStats } from "@/lib/types";
-import { LlmSelector } from "@/components/LlmSelector";
 import { Activity, AlertTriangle, Users, Layers } from "lucide-react";
 
 interface Props {
   stats: PipelineStats | undefined;
-  onLlmChanged?: (message: string) => void;
 }
 
-export function StatsCards({ stats, onLlmChanged }: Props) {
+export function StatsCards({ stats }: Props) {
   const cards = [
     {
       label: "Total Alerts",
@@ -38,20 +36,19 @@ export function StatsCards({ stats, onLlmChanged }: Props) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
       {cards.map((card) => (
         <div
           key={card.label}
-          className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-4 backdrop-blur"
+          className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-3 backdrop-blur"
         >
           <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-400">{card.label}</span>
-            <card.icon className={`h-4 w-4 ${card.color}`} />
+            <span className="text-xs text-slate-400">{card.label}</span>
+            <card.icon className={`h-3.5 w-3.5 ${card.color}`} />
           </div>
-          <p className="mt-2 text-2xl font-semibold text-white">{card.value}</p>
+          <p className="mt-1 text-xl font-semibold text-white">{card.value}</p>
         </div>
       ))}
-      <LlmSelector onChanged={onLlmChanged} />
     </div>
   );
 }

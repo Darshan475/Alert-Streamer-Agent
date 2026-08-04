@@ -87,7 +87,7 @@ export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
   if (!canReview) return null;
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-violet-500/5 p-4 space-y-4">
+    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/5 to-violet-500/5 p-3 space-y-3">
       <div className="flex items-center gap-2">
         <UserCheck className="h-4 w-4 text-amber-400" />
         <span className="font-medium text-amber-200 text-sm">Human-in-the-Loop Review</span>
@@ -116,7 +116,7 @@ export function HumanReviewPanel({ alert, onReviewComplete, onToast }: Props) {
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         <ActionBtn
           label="Approve"
           icon={CheckCircle2}
@@ -171,7 +171,7 @@ function ActionBtn({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`flex flex-1 min-w-[100px] items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-all disabled:opacity-50 ${colors[color]}`}
+      className={`flex flex-1 min-w-[72px] items-center justify-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-all disabled:opacity-50 ${colors[color]}`}
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
       {label}

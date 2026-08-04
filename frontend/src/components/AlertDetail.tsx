@@ -22,7 +22,7 @@ interface Props {
 export function AlertDetail({ alert, onReviewComplete, onToast }: Props) {
   if (!alert) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-900/20 p-12 text-center text-slate-500 min-h-[480px] flex flex-col items-center justify-center gap-2">
+      <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-900/20 p-8 text-center text-slate-500 min-h-[280px] flex flex-col items-center justify-center gap-2">
         <p>Select an alert to review LLM investigation</p>
         <p className="text-xs text-slate-600">Use Approve / Reject / Escalate for human-in-the-loop</p>
       </div>
@@ -32,7 +32,7 @@ export function AlertDetail({ alert, onReviewComplete, onToast }: Props) {
   const inv = alert.investigation;
 
   return (
-    <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-6 space-y-5 min-h-[480px] overflow-y-auto">
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 space-y-4 min-h-[320px]">
       <div>
         <div className="flex flex-wrap gap-2 mb-2">
           <span className={`rounded border px-2 py-0.5 text-xs ${severityColor(alert.severity)}`}>
@@ -41,7 +41,7 @@ export function AlertDetail({ alert, onReviewComplete, onToast }: Props) {
           <span className="rounded bg-slate-800 px-2 py-0.5 text-xs">{priorityLabel(alert.priority)}</span>
           <span className={`text-xs capitalize ${statusColor(alert.status)}`}>{alert.status.replace("_", " ")}</span>
         </div>
-        <h2 className="text-xl font-semibold text-white">{alert.title}</h2>
+        <h2 className="text-lg font-semibold text-white">{alert.title}</h2>
         <p className="text-slate-400 mt-2">{alert.description}</p>
       </div>
 
