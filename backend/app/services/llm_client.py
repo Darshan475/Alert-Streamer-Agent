@@ -66,8 +66,8 @@ class LLMClient:
             "Content-Type": "application/json",
         }
         if self.provider == "openrouter":
-            headers["HTTP-Referer"] = "http://localhost:8000"
-            headers["X-Title"] = "Alert Streamer"
+            headers["HTTP-Referer"] = self._settings.openrouter_site_url
+            headers["X-Title"] = self._settings.openrouter_app_name
 
         body: dict[str, Any] = {
             "model": self.model,
@@ -135,6 +135,11 @@ class LLMClient:
             return (
                 f"HTTP {code}: Invalid or expired HF token. "
                 "Create a fine-grained token with 'Make calls to Inference Providers' at huggingface.co/settings/tokens"
+            )
+        if self.provider == "openrouter" and code == 404:
+            return (
+                f"HTTP 404: Model '{self.model}' not found on OpenRouter. "
+                "Set LLM_MODEL=openai/gpt-4o-mini or openai/gpt-4o in backend env."
             )
         return str(exc)
 

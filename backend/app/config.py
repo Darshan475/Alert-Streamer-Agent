@@ -13,7 +13,7 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
-        "model": "meta-llama/llama-3.3-70b-instruct:free",
+        "model": "openai/gpt-4o-mini",
     },
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
@@ -117,6 +117,8 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     llm_temperature: float = 0.3
     seed_demo_alerts: bool = True
+    openrouter_site_url: str = "https://alert-streamer-frontend.vercel.app"
+    openrouter_app_name: str = "Alert Streamer"
 
     @property
     def cors_origin_list(self) -> list[str]:

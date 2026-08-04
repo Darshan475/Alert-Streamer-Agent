@@ -47,7 +47,7 @@ async def seed_demo_alerts(
 
     for entry in raw_alerts[:max_alerts]:
         alert = AlertIngest.model_validate(entry)
-        response, record = await pipeline.process(alert)
+        response, record = await pipeline.process(alert, store=store)
         if not response.accepted or record is None:
             continue
         await store.save(record)

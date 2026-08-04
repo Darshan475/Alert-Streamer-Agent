@@ -7,23 +7,24 @@ import { AlertDetail } from "@/components/AlertDetail";
 import { AppShell } from "@/components/AppShell";
 import { StatsCards } from "@/components/StatsCards";
 import { ChatModal } from "@/components/ChatModal";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Pagination } from "@/components/Pagination";
 import { StatusFilterTabs } from "@/components/StatusFilterTabs";
 import { Toast } from "@/components/Toast";
 import { useAlerts, useHealth, useStats } from "@/hooks/useAlerts";
-import type { AlertStatus } from "@/lib/types";
+import { computeFilterCounts, filterAlerts, type FilterId } from "@/lib/alertFilters";
 import { ExternalLink } from "lucide-react";
 
 const PAGE_SIZE = 5;
 
 export function AlertsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<AlertStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<FilterId>("all");
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const { data: alertsData, error, mutate } = useAlerts();
-  const { data: stats, mutate: mutateStats } = useStats();
+  const { data: alertsData, error, mutate, isLoading, isValidating } = useAlerts();
+  const { data: stats, mutate: mutateStats, isLoading: statsLoading } = useStats();
   const { mutate: mutateHealth } = useHealth();
 
   const silentRefresh = useCallback(() => {
@@ -32,10 +33,11 @@ export function AlertsPage() {
   }, [mutate, mutateStats]);
 
   const alerts = alertsData?.items ?? [];
-  const filteredAlerts = useMemo(() => {
-    if (statusFilter === "all") return alerts;
-    return alerts.filter((a) => a.status === statusFilter);
-  }, [alerts, statusFilter]);
+  const filterCounts = useMemo(() => computeFilterCounts(alerts), [alerts]);
+  const filteredAlerts = useMemo(
+    () => filterAlerts(alerts, statusFilter),
+    [alerts, statusFilter]
+  );
 
   const totalPages = Math.max(1, Math.ceil(filteredAlerts.length / PAGE_SIZE));
   const paginatedAlerts = useMemo(() => {
@@ -44,7 +46,7 @@ export function AlertsPage() {
   }, [filteredAlerts, page]);
 
   const selectedAlert = alerts.find((a) => a.id === selectedId) ?? null;
-  const statusCounts = stats?.by_status ?? {};
+  const showLoader = (isLoading && !alertsData) || (isValidating && !alerts.length);
 
   useEffect(() => {
     setPage(1);
@@ -64,7 +66,9 @@ export function AlertsPage() {
         setToast({ message, type: "success" });
       }}
     >
-      <div className="h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
+      <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
+        <LoadingOverlay show={showLoader || statsLoading} label="Syncing alert stream…" />
+
         {error && (
           <div className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-300 text-sm">
             Cannot reach backend at {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}.
@@ -72,34 +76,33 @@ export function AlertsPage() {
           </div>
         )}
 
-        <StatsCards stats={stats} />
+        <StatsCards stats={stats} alertCount={filterCounts.all} />
 
-        {/* Aligned two-column grid: headers share row 1, content shares row 3 */}
         <div className="flex-1 min-h-0 grid lg:grid-cols-12 lg:grid-rows-[auto_auto_1fr_auto] gap-x-4 gap-y-2">
-          <h2 className="lg:col-span-7 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end">
+          <h2 className="lg:col-span-7 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end leading-none pb-0.5">
             Alert Stream ({filteredAlerts.length})
           </h2>
-          <h2 className="lg:col-span-5 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end">
+          <h2 className="lg:col-span-5 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end leading-none pb-0.5">
             Investigation & Human Review
           </h2>
 
-          <div className="lg:col-span-7 lg:row-start-2">
+          <div className="lg:col-span-7 lg:row-start-2 min-h-[2.25rem] flex items-end">
             <StatusFilterTabs
               active={statusFilter}
-              counts={{ ...statusCounts, all: alertsData?.total ?? alerts.length }}
+              counts={filterCounts}
               onChange={setStatusFilter}
             />
           </div>
-          <div className="hidden lg:block lg:col-span-5 lg:row-start-2" aria-hidden />
+          <div className="hidden lg:block lg:col-span-5 lg:row-start-2 min-h-[2.25rem]" aria-hidden />
 
-          <div className="lg:col-span-7 lg:row-start-3 min-h-0 overflow-y-auto pr-1">
+          <div className="lg:col-span-7 lg:row-start-3 min-h-0 overflow-y-auto pr-1 scroll-panel">
             <AlertList
               alerts={paginatedAlerts}
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
           </div>
-          <div className="lg:col-span-5 lg:row-start-3 min-h-0 overflow-y-auto">
+          <div className="lg:col-span-5 lg:row-start-3 min-h-0 overflow-y-auto scroll-panel">
             <AlertDetail
               alert={selectedAlert}
               onReviewComplete={silentRefresh}

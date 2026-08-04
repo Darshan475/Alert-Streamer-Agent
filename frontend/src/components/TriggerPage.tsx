@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
 import { ingestAlert, getHealth, getStats, API_BASE } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
@@ -47,6 +48,8 @@ export function TriggerPage() {
   const [sent, setSent] = useState(0);
   const [accepted, setAccepted] = useState(0);
   const [rejected, setRejected] = useState(0);
+  const [duplicates, setDuplicates] = useState(0);
+  const [samplesLoading, setSamplesLoading] = useState(true);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const stopRef = useRef(false);
@@ -56,7 +59,8 @@ export function TriggerPage() {
     fetch("/sample-alerts.json")
       .then((r) => r.json())
       .then((data: SampleAlertsFile) => setSamples(data.alerts ?? []))
-      .catch(() => setToast({ message: "Failed to load sample alerts", type: "error" }));
+      .catch(() => setToast({ message: "Failed to load sample alerts", type: "error" }))
+      .finally(() => setSamplesLoading(false));
   }, []);
 
   useEffect(() => {
@@ -96,6 +100,7 @@ export function TriggerPage() {
 
       setSent((n) => n + 1);
       if (status === "accepted") setAccepted((n) => n + 1);
+      else if (status === "duplicate") setDuplicates((n) => n + 1);
       else if (status === "rejected" || status === "error") setRejected((n) => n + 1);
     },
     []
@@ -123,6 +128,7 @@ export function TriggerPage() {
     setSent(0);
     setAccepted(0);
     setRejected(0);
+    setDuplicates(0);
 
     for (const alert of samples) {
       if (stopRef.current) break;
@@ -150,9 +156,9 @@ export function TriggerPage() {
       subtitle="Stream monitoring events into the pipeline"
       showControls={false}
     >
-      <div className="h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-        {/* Status strip — Datadog-style metrics bar */}
-        <div className="shrink-0 grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
+        <LoadingOverlay show={samplesLoading} label="Loading event catalog…" />
+        <div className="shrink-0 grid grid-cols-2 lg:grid-cols-6 gap-3">
           <MetricCard
             label="Backend"
             value={backendOk === null ? "…" : backendOk ? "Connected" : "Offline"}
@@ -162,6 +168,7 @@ export function TriggerPage() {
           <MetricCard label="Events Sent" value={String(sent)} icon={Activity} color="text-cyan-400" />
           <MetricCard label="Accepted" value={String(accepted)} icon={CheckCircle2} color="text-emerald-400" />
           <MetricCard label="Rejected" value={String(rejected)} icon={XCircle} color="text-red-400" />
+          <MetricCard label="Duplicates" value={String(duplicates)} icon={Loader2} color="text-amber-400" />
           <MetricCard label="Sample Set" value={String(samples.length)} icon={Play} color="text-purple-400" />
         </div>
 
@@ -211,7 +218,7 @@ export function TriggerPage() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scroll-panel">
               {samples.map((alert, i) => (
                 <div
                   key={`${alert.title}-${i}`}
@@ -262,7 +269,7 @@ export function TriggerPage() {
 
             <div
               ref={logRef}
-              className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#070a12] font-mono text-xs p-3 space-y-1"
+              className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#070a12] font-mono text-xs p-3 space-y-1 scroll-panel"
             >
               {events.length === 0 ? (
                 <p className="text-slate-600 text-center py-12">
@@ -297,7 +304,7 @@ export function TriggerPage() {
             </div>
 
             <p className="shrink-0 text-[10px] text-slate-600 truncate">
-              POST {API_BASE}/api/v1/alerts/ingest · polling pipeline every 3s on Monitor page
+              Resolved tickets re-open as new alerts · open duplicates are suppressed · POST {API_BASE}/api/v1/alerts/ingest
             </p>
           </div>
         </div>

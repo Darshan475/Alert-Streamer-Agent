@@ -82,7 +82,7 @@ async def ingest_alert(
     store: AlertStore = Depends(get_store),
 ) -> AlertIngestResponse:
     """Receive alert, validate, deduplicate, prioritize, assign team, and queue investigation."""
-    response, record = await pipeline.process(payload)
+    response, record = await pipeline.process(payload, store=store)
     if not response.accepted or record is None:
         return response
 
@@ -97,9 +97,13 @@ async def list_alerts(
     team: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    include_duplicates: bool = Query(False),
     store: AlertStore = Depends(get_store),
 ) -> AlertListResponse:
-    items, total = await store.list_alerts(status=status_filter, team=team, limit=limit, offset=offset)
+    exclude = None if include_duplicates else {AlertStatus.DUPLICATE}
+    items, total = await store.list_alerts(
+        status=status_filter, team=team, limit=limit, offset=offset, exclude_statuses=exclude
+    )
     return AlertListResponse(total=total, items=items)
 
 

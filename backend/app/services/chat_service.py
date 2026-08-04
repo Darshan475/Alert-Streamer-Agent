@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from app.models.schemas import AlertRecord
+from app.models.schemas import AlertRecord, AlertStatus
 from app.services.alert_store import AlertStore
 from app.services.llm_client import LLMClient
 
@@ -19,17 +19,22 @@ class ChatService:
 
     async def reply(self, message: str, alert_id: UUID | None = None) -> tuple[str, bool]:
         context_used = False
-        context_block = ""
+        context_parts: list[str] = []
 
         if alert_id:
             alert = await self._store.get(alert_id)
             if alert:
                 context_used = True
-                context_block = self._format_alert_context(alert)
+                context_parts.append(self._format_alert_context(alert))
+        else:
+            stream_context = await self._format_stream_context()
+            if stream_context:
+                context_used = True
+                context_parts.append(stream_context)
 
         user_content = message
-        if context_block:
-            user_content = f"{context_block}\n\nUser question: {message}"
+        if context_parts:
+            user_content = "\n\n".join(context_parts) + f"\n\nUser question: {message}"
 
         reply = await self._llm.chat(
             [
@@ -39,6 +44,30 @@ class ChatService:
             temperature=0.4,
         )
         return reply, context_used
+
+    async def _format_stream_context(self) -> str:
+        items, total = await self._store.list_alerts(
+            limit=15,
+            exclude_statuses={AlertStatus.DUPLICATE},
+        )
+        if not items:
+            return "Current alert stream: empty — no active alerts in the store."
+
+        stats = await self._store.stats()
+        lines = [
+            f"Current alert stream ({total} active alerts):",
+            f"- Total: {stats.total_alerts} | Needs review (P1/P2): {stats.by_status.get('needs_review', 0)}",
+            f"- By status: {stats.by_status}",
+            "",
+            "Recent alerts:",
+        ]
+        for alert in items[:8]:
+            inv = " [investigated]" if alert.investigation else ""
+            lines.append(
+                f"- [{alert.status.value}] P{alert.priority} {alert.severity.value} | "
+                f"{alert.service}/{alert.environment}: {alert.title}{inv}"
+            )
+        return "\n".join(lines)
 
     @staticmethod
     def _format_alert_context(alert: AlertRecord) -> str:

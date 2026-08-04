@@ -3,6 +3,7 @@
 import hashlib
 import json
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from app.models.schemas import (
@@ -51,6 +52,13 @@ SEVERITY_PRIORITY: dict[AlertSeverity, int] = {
 
 # Only P1 and P2 require human review; P3+ auto-resolve after LLM investigation
 HUMAN_REVIEW_MAX_PRIORITY = 2
+
+CLOSED_STATUSES = frozenset(
+    {AlertStatus.RESOLVED, AlertStatus.REJECTED, AlertStatus.DUPLICATE}
+)
+
+if TYPE_CHECKING:
+    from app.services.alert_store import AlertStore
 
 
 def validate_alert(alert: AlertIngest) -> list[str]:
@@ -173,7 +181,12 @@ class AlertPipeline:
     def __init__(self, dedup_store: "DedupStore") -> None:
         self._dedup = dedup_store
 
-    async def process(self, alert: AlertIngest) -> tuple[AlertIngestResponse, AlertRecord | None]:
+    async def process(
+        self,
+        alert: AlertIngest,
+        *,
+        store: "AlertStore | None" = None,
+    ) -> tuple[AlertIngestResponse, AlertRecord | None]:
         errors = validate_alert(alert)
         if errors:
             return (
@@ -187,12 +200,23 @@ class AlertPipeline:
 
         fingerprint = compute_fingerprint(alert)
         existing_id = await self._dedup.get(fingerprint)
+
+        # Re-open resolved/rejected/duplicate tickets as new alerts
+        if existing_id and store is not None:
+            try:
+                existing = await store.get(UUID(existing_id))
+            except ValueError:
+                existing = None
+            if existing and existing.status in CLOSED_STATUSES:
+                await self._dedup.clear(fingerprint)
+                existing_id = None
+
         if existing_id:
             return (
                 AlertIngestResponse(
                     accepted=False,
                     status=AlertStatus.DUPLICATE,
-                    message="Duplicate alert suppressed",
+                    message="Duplicate alert suppressed (still open)",
                     duplicate_of=UUID(existing_id),
                 ),
                 None,
@@ -238,5 +262,8 @@ class DedupStore:
 
         self._cache[fingerprint] = (alert_id, time.time() + self._ttl)
 
-    async def clear(self) -> None:
+    async def clear(self, fingerprint: str) -> None:
+        self._cache.pop(fingerprint, None)
+
+    async def clear_all(self) -> None:
         self._cache.clear()

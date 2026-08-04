@@ -1,27 +1,26 @@
 "use client";
 
-import type { AlertStatus } from "@/lib/types";
+import type { FilterId } from "@/lib/alertFilters";
 
-const FILTERS: { id: AlertStatus | "all"; label: string }[] = [
+const FILTERS: { id: FilterId; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "pending_review", label: "Needs Review (P1/P2)" },
+  { id: "needs_review", label: "Needs Review (P1/P2)" },
   { id: "investigating", label: "Investigating" },
   { id: "escalated", label: "Escalated" },
   { id: "resolved", label: "Resolved" },
 ];
 
 interface Props {
-  active: AlertStatus | "all";
+  active: FilterId;
   counts: Record<string, number>;
-  onChange: (status: AlertStatus | "all") => void;
+  onChange: (status: FilterId) => void;
 }
 
 export function StatusFilterTabs({ active, counts, onChange }: Props) {
   return (
     <div className="flex flex-wrap gap-2">
       {FILTERS.map((f) => {
-        const count =
-          f.id === "all" ? (counts.all ?? 0) : (counts[f.id] ?? 0);
+        const count = counts[f.id] ?? 0;
         const isActive = active === f.id;
         return (
           <button

@@ -5,13 +5,14 @@ import { Activity, AlertTriangle, Users, Layers } from "lucide-react";
 
 interface Props {
   stats: PipelineStats | undefined;
+  alertCount?: number;
 }
 
-export function StatsCards({ stats }: Props) {
+export function StatsCards({ stats, alertCount }: Props) {
   const cards = [
     {
       label: "Total Alerts",
-      value: stats?.total_alerts ?? 0,
+      value: alertCount ?? stats?.total_alerts ?? 0,
       icon: Activity,
       color: "text-cyan-400",
     },
