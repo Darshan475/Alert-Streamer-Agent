@@ -1,15 +1,12 @@
-"""Agent API — generate alerts, auto-stream, batch review."""
+"""Agent API — generate alerts and auto-stream through the pipeline."""
 
-from uuid import UUID
-
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 
-from app.api.alerts import _run_investigation, get_pipeline, get_store
+from app.api.alerts import get_pipeline, get_store
 from app.api.security import verify_api_key
-from app.models.schemas import AlertIngest, AlertIngestResponse, HumanReviewDecision, HumanReviewRequest
+from app.models.schemas import AlertIngest, AlertIngestResponse
 from app.services.alert_generator_agent import AlertGeneratorAgent
-from app.services.review_actions import apply_human_review, batch_approve_alerts
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
@@ -37,14 +34,6 @@ class AutoStreamRequest(BaseModel):
 class AutoStreamResponse(BaseModel):
     generated: int
     results: list[AlertIngestResponse]
-
-
-class BatchReviewRequest(BaseModel):
-    alert_ids: list[UUID] = Field(..., min_length=1, max_length=50)
-    decision: HumanReviewDecision = HumanReviewDecision.APPROVE
-    reviewer: str = "chat-agent"
-    assigned_to: str = "on-call-engineer"
-    feedback: str = "Batch review via agent"
 
 
 @router.post("/generate-alert", response_model=GenerateAlertResponse)
@@ -93,36 +82,3 @@ async def auto_stream(
         generated=sum(1 for r in results if r.accepted),
         results=results,
     )
-
-
-@router.post("/batch-review")
-async def batch_review(
-    body: BatchReviewRequest,
-    store=Depends(get_store),
-) -> dict:
-    """Batch approve/reject/escalate alerts — used by chat agent and UI."""
-    if body.decision == HumanReviewDecision.APPROVE:
-        return await batch_approve_alerts(
-            store,
-            body.alert_ids,
-            reviewer=body.reviewer,
-            assigned_to=body.assigned_to,
-            feedback=body.feedback,
-        )
-
-    results = {"approved": [], "failed": []}
-    for aid in body.alert_ids:
-        payload = HumanReviewRequest(
-            decision=body.decision,
-            reviewer=body.reviewer,
-            feedback=body.feedback,
-            assigned_to=body.assigned_to,
-        )
-        record, err = await apply_human_review(store, aid, payload)
-        if record:
-            results["approved"].append(str(aid))
-        else:
-            results["failed"].append({"id": str(aid), "error": err})
-
-    results["count"] = len(results["approved"])
-    return results

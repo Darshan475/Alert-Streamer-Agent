@@ -284,7 +284,7 @@ export function TriggerPage() {
                 href="/alerts"
                 className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
               >
-                Review alerts
+                Review pipeline
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>

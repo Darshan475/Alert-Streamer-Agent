@@ -71,6 +71,9 @@ class ChatAgent:
         self._last_groups: list[dict] = []
 
     async def reply(self, message: str, alert_id: UUID | None = None) -> ChatAgentResult:
+        if not self._llm.is_configured:
+            return await self._offline_agent_loop(message, alert_id)
+
         context_used = False
         tool_calls: list[str] = []
         context_parts: list[str] = []
@@ -106,13 +109,12 @@ class ChatAgent:
                 text = raw
                 start, end = text.find("{"), text.rfind("}") + 1
                 if start >= 0 and end > start:
-                    parsed = json.loads(text[start:end])
+                    try:
+                        parsed = json.loads(text[start:end])
+                    except json.JSONDecodeError:
+                        return await self._offline_agent_loop(message, alert_id, partial_tools=tool_calls)
                 else:
-                    return ChatAgentResult(
-                        reply=raw,
-                        alert_context_used=context_used,
-                        tool_calls=tool_calls,
-                    )
+                    return await self._offline_agent_loop(message, alert_id, partial_tools=tool_calls)
 
             if parsed.get("type") == "final" or "reply" in parsed and parsed.get("type") != "tool":
                 reply = parsed.get("reply", raw)
@@ -253,6 +255,107 @@ class ChatAgent:
             return {"accepted": False, "message": response.message}
 
         return {"error": f"Unknown tool: {tool}"}
+
+    async def _offline_agent_loop(
+        self,
+        message: str,
+        alert_id: UUID | None = None,
+        *,
+        partial_tools: list[str] | None = None,
+    ) -> ChatAgentResult:
+        """Rule-based multi-step agent when LLM is unavailable."""
+        tool_calls = list(partial_tools or [])
+        context_used = alert_id is not None
+        lower = message.lower()
+        groups: list[dict] = []
+        reply_parts: list[str] = ["**Offline pipeline agent** — running tools without LLM.\n"]
+
+        stats = await self._execute_tool("get_stats", {})
+        tool_calls.append("get_stats")
+        if isinstance(stats, dict):
+            reply_parts.append(
+                f"- **Stream:** {stats.get('total_alerts', 0)} alerts | "
+                f"status: {stats.get('by_status', {})}"
+            )
+
+        if any(k in lower for k in ("generate", "ingest", "pipeline", "run", "create", "new alert")):
+            result = await self._execute_tool("generate_and_ingest", {"hint": message})
+            tool_calls.append("generate_and_ingest")
+            if isinstance(result, dict) and result.get("accepted"):
+                stages = result.get("pipeline_stages") or ["validate", "deduplicate", "prioritize"]
+                reply_parts.append(
+                    f"- **Ingested:** {result.get('title')} → P{result.get('priority')} "
+                    f"({' → '.join(stages)})"
+                )
+            else:
+                reply_parts.append(f"- **Ingest failed:** {result.get('message', result) if isinstance(result, dict) else result}")
+
+        elif "group" in lower:
+            groups = await self._execute_tool("group_alerts", {"status": "prioritized"})
+            tool_calls.append("group_alerts")
+            if isinstance(groups, list):
+                self._last_groups = groups
+                if groups:
+                    for g in groups[:8]:
+                        reply_parts.append(
+                            f"- **{g.get('service')}** ({g.get('environment')}): {g.get('count')} alert(s)"
+                        )
+                else:
+                    reply_parts.append("- No prioritized alerts to group.")
+
+        elif any(k in lower for k in ("list", "p1", "p2", "priority", "show", "critical", "high")):
+            priority = None
+            if "p1" in lower or "critical" in lower:
+                priority = 1
+            elif "p2" in lower or ("priority 2" in lower):
+                priority = 2
+            status = "prioritized" if "prioritized" in lower or priority else "all"
+            result = await self._execute_tool("list_alerts", {"status": status, "priority": priority})
+            tool_calls.append("list_alerts")
+            if isinstance(result, dict):
+                alerts = result.get("alerts") or []
+                if alerts:
+                    for a in alerts[:10]:
+                        stages = " → ".join(a.get("pipeline_stages") or [])
+                        reply_parts.append(
+                            f"- P{a.get('priority')} **{a.get('title')}** ({a.get('service')})"
+                            + (f" — {stages}" if stages else "")
+                        )
+                else:
+                    reply_parts.append("- No matching alerts in the stream.")
+
+        elif alert_id:
+            result = await self._execute_tool("get_alert", {"alert_id": str(alert_id)})
+            tool_calls.append("get_alert")
+            if isinstance(result, dict) and not result.get("error"):
+                stages = " → ".join(result.get("pipeline_stages") or [])
+                reply_parts.append(
+                    f"- **Selected alert:** P{result.get('priority')} {result.get('title')} "
+                    f"({result.get('status')})"
+                    + (f" — pipeline: {stages}" if stages else "")
+                )
+
+        elif "pipeline" in lower or "validate" in lower or "dedup" in lower or "stage" in lower:
+            reply_parts.append(
+                "- Pipeline stages: **Ingest → Validate → Deduplicate → Prioritize** (fully autonomous, no human review)."
+            )
+
+        else:
+            reply_parts.append(
+                "- Ask me to **list alerts**, **group by service**, **generate & ingest**, or **summarize the stream**."
+            )
+
+        steps = tool_calls.copy()
+        if "generate_and_ingest" in tool_calls:
+            steps.extend(["Validate", "Deduplicate", "Prioritize"])
+
+        return ChatAgentResult(
+            reply="\n".join(reply_parts),
+            alert_context_used=context_used,
+            groups=groups or self._last_groups,
+            tool_calls=tool_calls,
+            steps=steps,
+        )
 
     @staticmethod
     def _format_alert(alert) -> str:

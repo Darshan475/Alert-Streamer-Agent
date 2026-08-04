@@ -178,7 +178,7 @@ class LLMClient:
             return f"LLM call failed ({self.provider}): {error[:200]}. {hint}"
         return (
             f"No LLM API key configured. {self._key_hint()} "
-            "Alerts still ingest and display — only AI investigation uses the fallback."
+            "Alerts still ingest via the pipeline agent — chat runs in offline tool mode."
         )
 
     def _key_hint(self) -> str:

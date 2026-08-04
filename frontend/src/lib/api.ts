@@ -100,19 +100,6 @@ export async function agentAutoStream(
   });
 }
 
-export async function batchReviewAlerts(payload: {
-  alert_ids: string[];
-  decision?: import("./types").HumanReviewDecision;
-  reviewer?: string;
-  assigned_to?: string;
-  feedback?: string;
-}): Promise<{ approved: string[]; failed: { id: string; error: string }[]; count: number }> {
-  return fetchJson("/api/v1/agents/batch-review", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function sendChat(
   message: string,
   alertId?: string
@@ -120,23 +107,6 @@ export async function sendChat(
   return fetchJson("/api/v1/chat", {
     method: "POST",
     body: JSON.stringify({ message, alert_id: alertId ?? null }),
-  });
-}
-
-export async function submitHumanReview(
-  alertId: string,
-  payload: {
-    decision: import("./types").HumanReviewDecision;
-    reviewer?: string;
-    feedback?: string;
-    override_recommendations?: string[];
-    assigned_team?: import("./types").Team;
-    assigned_to?: string;
-  }
-): Promise<import("./types").AlertRecord> {
-  return fetchJson(`/api/v1/alerts/${alertId}/human-review`, {
-    method: "POST",
-    body: JSON.stringify(payload),
   });
 }
 

@@ -15,8 +15,6 @@ from app.models.schemas import (
     Team,
 )
 
-HUMAN_REVIEW_MAX_PRIORITY = 2
-
 CLOSED_STATUSES = frozenset(
     {AlertStatus.RESOLVED, AlertStatus.REJECTED, AlertStatus.DUPLICATE}
 )

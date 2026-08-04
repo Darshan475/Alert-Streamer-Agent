@@ -3,14 +3,13 @@
 import type { ComponentType } from "react";
 import type { AlertRecord } from "@/lib/types";
 import {
-  formatTime,
   priorityLabel,
   severityColor,
   statusColor,
   teamLabel,
 } from "@/lib/utils";
 import { PipelineFlow } from "./PipelineFlow";
-import { Bot, Clock, Shield, Zap } from "lucide-react";
+import { Bot, Shield, Zap } from "lucide-react";
 
 interface Props {
   alert: AlertRecord;
@@ -21,11 +20,10 @@ interface Props {
 
 export function AlertDetailContent({
   alert,
-  onReviewComplete,
-  onToast,
+  onReviewComplete: _onReviewComplete,
+  onToast: _onToast,
   spacious = false,
 }: Props) {
-  const inv = alert.investigation;
   const titleClass = spacious ? "text-2xl" : "text-lg";
   const pad = spacious ? "space-y-6" : "space-y-4";
 
@@ -67,43 +65,6 @@ export function AlertDetailContent({
         {alert.hostname && <Meta label="Host" value={alert.hostname} spacious={spacious} />}
       </div>
 
-      {inv ? (
-        <div
-          className={`rounded-lg border border-emerald-500/20 bg-emerald-500/5 ${spacious ? "p-6 space-y-5" : "p-4 space-y-4"}`}
-        >
-          <div className="flex items-center gap-2 text-emerald-300">
-            <Bot className={spacious ? "h-5 w-5" : "h-4 w-4"} />
-            <span className="font-medium">LLM Investigation</span>
-            <span className="text-xs text-slate-500 ml-auto">{formatTime(inv.investigated_at)}</span>
-          </div>
-          <InvestigationBlock title="Root Cause" text={inv.root_cause} spacious={spacious} />
-          <InvestigationBlock title="Impact" text={inv.impact_assessment} spacious={spacious} />
-          <div>
-            <h4 className="text-sm font-medium text-slate-300">Recommendations</h4>
-            <ul className="mt-1 space-y-1">
-              {inv.recommendations.map((rec, i) => (
-                <li key={i} className="text-sm text-slate-400 flex gap-2">
-                  <span className="text-cyan-500">{i + 1}.</span>
-                  {rec}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex gap-4 text-sm">
-            <span className="text-amber-400">Urgency: {inv.urgency_score}/10</span>
-            {inv.estimated_resolution_minutes != null && (
-              <span className="text-slate-400 flex items-center gap-1">
-                <Clock className="h-3 w-3" /> ~{inv.estimated_resolution_minutes} min
-              </span>
-            )}
-          </div>
-        </div>
-      ) : alert.status === "investigating" ? (
-        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 text-amber-300 text-sm animate-pulse">
-          LLM is investigating this alert…
-        </div>
-      ) : null}
-
       {Array.isArray(alert.metadata?.pipeline_agent_log) && (
         <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-4 space-y-2">
           <div className="flex items-center gap-2 text-cyan-300 text-sm font-medium">
@@ -122,23 +83,6 @@ export function AlertDetailContent({
           </ul>
         </div>
       )}
-    </div>
-  );
-}
-
-function InvestigationBlock({
-  title,
-  text,
-  spacious,
-}: {
-  title: string;
-  text: string;
-  spacious?: boolean;
-}) {
-  return (
-    <div>
-      <h4 className="text-sm font-medium text-slate-300">{title}</h4>
-      <p className={`text-sm text-slate-400 mt-1 ${spacious ? "leading-relaxed" : ""}`}>{text}</p>
     </div>
   );
 }

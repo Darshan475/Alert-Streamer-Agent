@@ -1,7 +1,6 @@
-from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.security import verify_api_key
 from app.models.schemas import (
@@ -10,14 +9,10 @@ from app.models.schemas import (
     AlertListResponse,
     AlertRecord,
     AlertStatus,
-    HumanReviewRequest,
     PipelineStats,
 )
 from app.services.alert_pipeline import AlertPipeline
 from app.services.alert_store import AlertStore
-from app.services.investigation_agent import InvestigationAgent
-from app.services.review_actions import apply_human_review
-from app.services.routing_agent import RoutingAgent
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -32,44 +27,6 @@ def get_pipeline() -> AlertPipeline:
     from app.main import alert_pipeline
 
     return alert_pipeline
-
-
-def get_agent() -> InvestigationAgent:
-    from app.main import investigation_agent
-
-    return investigation_agent
-
-
-def get_routing_agent() -> RoutingAgent:
-    from app.main import routing_agent
-
-    return routing_agent
-
-
-async def _run_investigation(alert_id: UUID) -> None:
-    store = get_store()
-    agent = get_agent()
-    router = get_routing_agent()
-    alert = await store.get(alert_id)
-    if not alert:
-        return
-
-    alert.status = AlertStatus.INVESTIGATING
-    alert.updated_at = datetime.now(UTC)
-    await store.update(alert)
-
-    investigation = await agent.investigate(alert)
-    alert.investigation = investigation
-    now = datetime.now(UTC)
-
-    status, auto_review, reason = await router.route(alert, investigation)
-    alert.status = status
-    if auto_review:
-        alert.human_review = auto_review
-
-    alert.metadata = {**alert.metadata, "routing_reason": reason}
-    alert.updated_at = now
-    await store.update(alert)
 
 
 @router.post("/ingest", response_model=AlertIngestResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -126,33 +83,3 @@ async def get_alert(alert_id: UUID, store: AlertStore = Depends(get_store)) -> A
     return alert
 
 
-@router.post("/{alert_id}/human-review", response_model=AlertRecord)
-async def submit_human_review(
-    alert_id: UUID,
-    payload: HumanReviewRequest,
-    store: AlertStore = Depends(get_store),
-) -> AlertRecord:
-    """Human-in-the-loop: approve, reject, or escalate after LLM investigation."""
-    record, err = await apply_human_review(store, alert_id, payload)
-    if record is None:
-        if err and "not found" in err.lower():
-            raise HTTPException(status_code=404, detail=err)
-        raise HTTPException(status_code=409 if err and "closed" in err.lower() else 422, detail=err)
-    return record
-
-
-@router.post("/{alert_id}/investigate", response_model=AlertRecord)
-async def trigger_investigation(
-    alert_id: UUID,
-    background_tasks: BackgroundTasks,
-    _: str = Depends(verify_api_key),
-    store: AlertStore = Depends(get_store),
-) -> AlertRecord:
-    alert = await store.get(alert_id)
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-    background_tasks.add_task(_run_investigation, alert_id)
-    alert.status = AlertStatus.INVESTIGATING
-    alert.updated_at = datetime.now(UTC)
-    await store.update(alert)
-    return alert

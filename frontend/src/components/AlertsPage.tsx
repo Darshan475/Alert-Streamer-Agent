@@ -83,7 +83,7 @@ export function AlertsPage() {
             Alert Stream ({filteredAlerts.length})
           </h2>
           <h2 className="lg:col-span-5 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end leading-none pb-0.5">
-            Investigation & Human Review
+            Pipeline Details
           </h2>
 
           <div className="lg:col-span-7 lg:row-start-2 min-h-[2.25rem] flex items-end">

@@ -16,10 +16,8 @@ from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
 from app.services.chat_agent import ChatAgent
-from app.services.investigation_agent import InvestigationAgent
 from app.services.llm_client import LLMClient
 from app.services.pipeline_agent import PipelineAgent
-from app.services.routing_agent import RoutingAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,8 +32,6 @@ alert_store = AlertStore()
 dedup_store = DedupStore(ttl_seconds=settings.dedup_ttl_seconds)
 pipeline_agent = PipelineAgent(llm_client)
 alert_pipeline = AlertPipeline(dedup_store, pipeline_agent=pipeline_agent)
-investigation_agent = InvestigationAgent(llm_client)
-routing_agent = RoutingAgent(llm_client)
 alert_generator = AlertGeneratorAgent(llm_client)
 
 chat_agent = ChatAgent(
@@ -59,14 +55,7 @@ async def lifespan(app: FastAPI):
         llm_client.model,
     )
     if settings.seed_demo_alerts:
-        from app.api.alerts import _run_investigation
-
-        await seed_demo_alerts(
-            alert_store,
-            alert_pipeline,
-            _run_investigation,
-            alert_generator,
-        )
+        await seed_demo_alerts(alert_store, alert_pipeline, alert_generator)
     yield
     logger.info("Alert Streamer shutting down")
 

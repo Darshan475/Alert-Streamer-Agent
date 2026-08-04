@@ -8,7 +8,7 @@ import { Radio, RefreshCw, Zap, ShieldCheck } from "lucide-react";
 
 const NAV = [
   { href: "/trigger", label: "Trigger Events", icon: Zap },
-  { href: "/alerts", label: "Monitor & Review", icon: ShieldCheck },
+  { href: "/alerts", label: "Monitor Pipeline", icon: ShieldCheck },
 ] as const;
 
 interface AppShellProps {
@@ -23,7 +23,7 @@ interface AppShellProps {
 
 export function AppShell({
   children,
-  subtitle = "Validate and Review Trigger Events",
+  subtitle = "Agent Pipeline — Ingest · Validate · Dedup · Prioritize",
   onRefresh,
   onLlmChanged,
   showControls = true,
