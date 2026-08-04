@@ -148,7 +148,11 @@ class AlertGeneratorAgent:
 
         now = datetime.now(UTC)
         incident_id = str(random.randint(850000, 899999))
-        service = "digitalpromosmiscservices-prd" if not use_warn else "propertyupdate-queue"
+        service = (
+            f"digitalpromosmiscservices-{incident_id[-3]}-prd"
+            if not use_warn
+            else f"propertyupdate-{incident_id[-3]}"
+        )
 
         return AlertIngest(
             source="datadog",
