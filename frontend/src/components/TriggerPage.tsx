@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { generateAgentAlert, getHealth, getStats, API_BASE } from "@/lib/api";
+import { generateAgentAlert, getHealth, getStats } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
@@ -47,7 +47,6 @@ export function TriggerPage() {
   const [generating, setGenerating] = useState(false);
   const [delayMs, setDelayMs] = useState(800);
   const [streamCount, setStreamCount] = useState(5);
-  const [hint, setHint] = useState("");
   const [sent, setSent] = useState(0);
   const [accepted, setAccepted] = useState(0);
   const [rejected, setRejected] = useState(0);
@@ -98,11 +97,10 @@ export function TriggerPage() {
     []
   );
 
-  const generateAndIngest = useCallback(
-    async (scenarioHint?: string) => {
+  const generateAndIngest = useCallback(async () => {
       setGenerating(true);
       try {
-        const res = await generateAgentAlert(scenarioHint || hint || undefined);
+        const res = await generateAgentAlert();
         setGenerated((prev) => [res.alert, ...prev].slice(0, 12));
         pushEvent(res.alert, res.ingest);
         return res;
@@ -113,7 +111,7 @@ export function TriggerPage() {
           {
             source: "datadog",
             alert_type: "generation_error",
-            title: scenarioHint || hint || "Alert generation failed",
+            title: "Alert generation failed",
             description: message,
             severity: "high",
             service: "pss-bws",
@@ -127,7 +125,7 @@ export function TriggerPage() {
         setGenerating(false);
       }
     },
-    [hint, pushEvent]
+    [pushEvent]
   );
 
   const autoStream = useCallback(async () => {
@@ -142,7 +140,7 @@ export function TriggerPage() {
 
     for (let i = 0; i < streamCount; i++) {
       if (stopRef.current) break;
-      await generateAndIngest(hint || undefined);
+      await generateAndIngest();
       if (delayMs > 0 && !stopRef.current && i < streamCount - 1) {
         await new Promise((r) => setTimeout(r, delayMs));
       }
@@ -154,7 +152,7 @@ export function TriggerPage() {
     } catch {
       /* ignore */
     }
-  }, [streaming, backendOk, streamCount, delayMs, hint, generateAndIngest]);
+  }, [streaming, backendOk, streamCount, delayMs, generateAndIngest]);
 
   const stopStream = () => {
     stopRef.current = true;
@@ -180,18 +178,13 @@ export function TriggerPage() {
           <MetricCard label="Agent Gen" value={String(generated.length)} icon={Bot} color="text-purple-400" />
         </div>
 
-        <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-3 sm:p-4 space-y-3">
-          <div className="flex items-center gap-2 text-violet-300">
-            <Sparkles className="h-4 w-4 shrink-0" />
-            <span className="text-sm font-medium">Alert Generator Agent</span>
-          </div>
-          <input
-            value={hint}
-            onChange={(e) => setHint(e.target.value)}
-            placeholder="Optional hint (e.g. SQS volume, API 5xx…)"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
-          />
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="shrink-0 w-full max-w-md">
+          <div className="rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-violet-300">
+              <Sparkles className="h-4 w-4 shrink-0" />
+              <span className="text-sm font-medium">Alert Generator</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-1.5 text-xs text-slate-500">
               Count
               <select
@@ -248,6 +241,7 @@ export function TriggerPage() {
                 Auto Stream
               </button>
             )}
+            </div>
           </div>
         </div>
 
