@@ -81,25 +81,22 @@ export function AlertsPage() {
         <StatsCards stats={stats} alertCount={filterCounts.all} />
 
         <div className="flex-1 min-h-0 flex flex-col gap-2">
-          <div className="shrink-0 flex flex-wrap items-end justify-between gap-2">
-            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+          <div className="shrink-0 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider shrink-0">
               Alert Stream ({filteredAlerts.length})
             </h2>
-            <Link
-              href="/trigger"
-              className="flex items-center gap-1.5 text-xs text-cyan-400/80 hover:text-cyan-300 transition-colors"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Trigger events
-            </Link>
-          </div>
-
-          <div className="shrink-0 min-h-[2.25rem] flex items-end">
             <StatusFilterTabs
               active={statusFilter}
               counts={filterCounts}
               onChange={setStatusFilter}
             />
+            <Link
+              href="/trigger"
+              className="ml-auto flex items-center gap-1.5 text-xs text-cyan-400/80 hover:text-cyan-300 transition-colors shrink-0"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Trigger events
+            </Link>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto pr-1 scroll-panel">
