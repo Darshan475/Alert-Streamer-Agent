@@ -4,9 +4,8 @@ import type { FilterId } from "@/lib/alertFilters";
 
 const FILTERS: { id: FilterId; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "needs_review", label: "Needs Review (P1/P2)" },
-  { id: "investigating", label: "Investigating" },
-  { id: "escalated", label: "Escalated" },
+  { id: "prioritized", label: "Prioritized" },
+  { id: "rejected", label: "Rejected" },
   { id: "resolved", label: "Resolved" },
 ];
 

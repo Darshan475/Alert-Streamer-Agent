@@ -10,7 +10,6 @@ import {
   teamLabel,
 } from "@/lib/utils";
 import { PipelineFlow } from "./PipelineFlow";
-import { HumanReviewPanel } from "./HumanReviewPanel";
 import { Bot, Clock, Shield, Zap } from "lucide-react";
 
 interface Props {
@@ -105,7 +104,24 @@ export function AlertDetailContent({
         </div>
       ) : null}
 
-      <HumanReviewPanel alert={alert} onReviewComplete={onReviewComplete} onToast={onToast} />
+      {Array.isArray(alert.metadata?.pipeline_agent_log) && (
+        <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-cyan-300 text-sm font-medium">
+            <Bot className="h-4 w-4" />
+            Agent Pipeline Log
+          </div>
+          <ul className="space-y-1">
+            {(alert.metadata.pipeline_agent_log as Array<{ stage?: string; reasoning?: string }>).map(
+              (entry, i) => (
+                <li key={i} className="text-xs text-slate-400">
+                  <span className="text-emerald-400 capitalize">{entry.stage}</span>
+                  {entry.reasoning ? ` — ${entry.reasoning}` : ""}
+                </li>
+              )
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

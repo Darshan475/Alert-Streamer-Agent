@@ -57,7 +57,7 @@ export function AlertsPage() {
 
   return (
     <AppShell
-      subtitle="Validate and Review Trigger Events"
+      subtitle="Agent Pipeline — Ingest · Validate · Dedup · Prioritize"
       live
       chatAlertId={selectedId}
       onRefresh={silentRefresh}

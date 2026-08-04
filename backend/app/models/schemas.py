@@ -169,6 +169,8 @@ class ChatResponse(BaseModel):
     alert_context_used: bool = False
     actions: list[dict] = Field(default_factory=list)
     groups: list[dict] = Field(default_factory=list)
+    tool_calls: list[str] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=list)
 
 
 class PipelineStats(BaseModel):

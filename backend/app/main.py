@@ -38,19 +38,11 @@ investigation_agent = InvestigationAgent(llm_client)
 routing_agent = RoutingAgent(llm_client)
 alert_generator = AlertGeneratorAgent(llm_client)
 
-
-def _run_investigation_ref(alert_id):
-    from app.api.alerts import _run_investigation
-
-    return _run_investigation(alert_id)
-
-
 chat_agent = ChatAgent(
     llm_client,
     alert_store,
     alert_generator,
     alert_pipeline,
-    _run_investigation_ref,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -81,8 +73,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Alert Streamer",
-    description="Fully agent-driven alert pipeline — no static JSON data",
-    version="2.1.0",
+    description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
+    version="2.2.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -110,12 +102,10 @@ async def health():
         "llm_configured": llm_client.is_configured,
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
-        "pipeline": "agent-driven",
+        "pipeline": "ingest → validate → deduplicate → prioritize",
         "agents": [
             "pipeline",
             "generator",
-            "investigation",
-            "routing",
             "chat",
         ],
     }

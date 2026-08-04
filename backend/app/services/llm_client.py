@@ -198,20 +198,15 @@ class LLMClient:
             else "Offline mode — "
         )
 
-        if any(k in lower for k in ("p1", "priority 1", "critical")):
+        if any(k in lower for k in ("p1", "priority 1", "critical", "p2", "priority 2", "high")):
             return (
-                f"{prefix}P1 alerts are highest severity. They require human review after LLM "
-                "investigation. Check the Investigation panel, then Approve, Reject, or Escalate."
+                f"{prefix}P1/P2 alerts are highest severity. The agent pipeline validates, "
+                "deduplicates, and prioritizes them automatically — no human review required."
             )
-        if any(k in lower for k in ("p2", "priority 2", "high")):
+        if "pipeline" in lower or "ingest" in lower or "validate" in lower or "dedup" in lower:
             return (
-                f"{prefix}P2 alerts also require human-in-the-loop review before resolution. "
-                "Select an alert from the stream for context-aware guidance."
-            )
-        if "human" in lower or "review" in lower or "hitl" in lower:
-            return (
-                f"{prefix}Human review applies to P1–P2 only. P3+ auto-resolve after investigation. "
-                "Use Approve / Reject / Escalate on the selected alert."
+                f"{prefix}The agent pipeline runs: Ingest → Validate → Deduplicate → Prioritize. "
+                "Use the chat agent to generate alerts or ask for stream stats."
             )
         if "alert" in lower or "data" in lower or "empty" in lower:
             return (
@@ -219,8 +214,8 @@ class LLMClient:
                 "Demo alerts auto-seed on startup; run `python scripts/trigger_alerts.py` for more."
             )
         return (
-            f"{prefix}I can help with alert priorities, investigations, and human review. "
-            "Select an alert for context, or ask about P1/P2 workflow."
+            f"{prefix}I run the alert pipeline agent: ingest, validate, deduplicate, prioritize. "
+            "Ask me to generate alerts, list prioritized items, or summarize the stream."
         )
 
 

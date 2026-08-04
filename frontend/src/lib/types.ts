@@ -114,6 +114,8 @@ export interface ChatResponse {
   alert_context_used: boolean;
   actions?: ChatAction[];
   groups?: AlertGroup[];
+  tool_calls?: string[];
+  steps?: string[];
 }
 
 export interface ChatAction {
@@ -171,10 +173,6 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   { id: "validate", label: "Validate", description: "AI validation agent checks quality" },
   { id: "dedup", label: "Deduplicate", description: "AI dedup agent vs open alerts" },
   { id: "prioritize", label: "Prioritize", description: "AI assigns P1–P5 priority" },
-  { id: "assign", label: "Assign Team", description: "AI routes to owning team" },
-  { id: "investigate", label: "Investigate", description: "Investigation agent root cause" },
-  { id: "human_review", label: "Human Review", description: "Engineer review for P1/P2" },
-  { id: "resolve", label: "Resolve", description: "Routing agent closes alert" },
 ];
 
 export function statusToStageIndex(status: AlertStatus): number {
@@ -185,11 +183,11 @@ export function statusToStageIndex(status: AlertStatus): number {
     rejected: 2,
     duplicate: 2,
     prioritized: 3,
-    assigned: 4,
-    investigating: 5,
-    pending_review: 6,
-    escalated: 6,
-    resolved: 7,
+    assigned: 3,
+    investigating: 3,
+    pending_review: 3,
+    escalated: 3,
+    resolved: 3,
   };
   return map[status] ?? 0;
 }

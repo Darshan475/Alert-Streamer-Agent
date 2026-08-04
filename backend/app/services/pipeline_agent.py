@@ -1,4 +1,4 @@
-"""Full LangGraph pipeline agent — all stages AI-driven (ingest → validate → dedup → prioritize → assign)."""
+"""LangGraph pipeline agent — Ingest → Validate → Deduplicate → Prioritize (no HITL)."""
 
 import json
 import logging
@@ -23,9 +23,6 @@ Stage "deduplicate": compare against open alerts — semantic duplicate if same 
 
 Stage "prioritize": assign P1-P5 from severity, impact, metrics.
 {"stage":"prioritize","priority":1-5,"reasoning":""}
-
-Stage "assign": route to owning team and category.
-{"stage":"assign","category":"cpu|memory|disk|pod|database|api|ssl|kubernetes|error_rate|payment|other","team":"platform|sre|database|security|payments|frontend|backend","reasoning":""}
 
 Be decisive. P1/P2 for critical production incidents. Payment/k8s critical = P1-P2."""
 
@@ -60,7 +57,7 @@ class PipelineAgentResult:
 
 
 class PipelineAgent:
-    """Orchestrates ingest → validate → deduplicate → prioritize → assign via LLM agents."""
+    """Orchestrates validate → deduplicate → prioritize via LLM agents."""
 
     def __init__(self, llm: LLMClient) -> None:
         self._llm = llm
@@ -71,12 +68,10 @@ class PipelineAgent:
         graph.add_node("validate", self._validate_node)
         graph.add_node("deduplicate", self._dedup_node)
         graph.add_node("prioritize", self._prioritize_node)
-        graph.add_node("assign", self._assign_node)
         graph.add_edge(START, "validate")
         graph.add_conditional_edges("validate", self._after_validate, {"continue": "deduplicate", "reject": END})
         graph.add_conditional_edges("deduplicate", self._after_dedup, {"continue": "prioritize", "duplicate": END})
-        graph.add_edge("prioritize", "assign")
-        graph.add_edge("assign", END)
+        graph.add_edge("prioritize", END)
         return graph.compile()
 
     @staticmethod
@@ -162,22 +157,44 @@ class PipelineAgent:
             log.append({"stage": "prioritize", "priority": priority, "reasoning": "severity mapping fallback"})
             return {**state, "priority": priority, "stage_log": log}
 
-    async def _assign_node(self, state: PipelineState) -> PipelineState:
-        alert = state["alert"]
-        log = list(state.get("stage_log") or [])
-        try:
-            result = await self._call_stage("assign", alert)
-            log.append({"stage": "assign", **result})
-            return {
-                **state,
-                "category": result.get("category", "other"),
-                "team": result.get("team", "sre"),
-                "stage_log": log,
-            }
-        except Exception as exc:
-            logger.warning("Assign agent error: %s", exc)
-            log.append({"stage": "assign", "category": "other", "team": "sre", "reasoning": "default routing"})
-            return {**state, "category": "other", "team": "sre", "stage_log": log}
+    @staticmethod
+    def _infer_category_team(alert: dict) -> tuple[AlertCategory, Team]:
+        alert_type = str(alert.get("alert_type", "")).lower()
+        service = str(alert.get("service", "")).lower()
+        type_map = {
+            "cpu": AlertCategory.CPU,
+            "memory": AlertCategory.MEMORY,
+            "disk": AlertCategory.DISK,
+            "pod": AlertCategory.POD,
+            "database": AlertCategory.DATABASE,
+            "api": AlertCategory.API,
+            "ssl": AlertCategory.SSL,
+            "kubernetes": AlertCategory.KUBERNETES,
+            "k8s": AlertCategory.KUBERNETES,
+            "error": AlertCategory.ERROR_RATE,
+            "payment": AlertCategory.PAYMENT,
+        }
+        category = AlertCategory.OTHER
+        for key, cat in type_map.items():
+            if key in alert_type:
+                category = cat
+                break
+
+        if "payment" in service or category == AlertCategory.PAYMENT:
+            team = Team.PAYMENTS
+        elif category == AlertCategory.DATABASE:
+            team = Team.DATABASE
+        elif category in (AlertCategory.KUBERNETES, AlertCategory.POD):
+            team = Team.PLATFORM
+        elif "security" in service or "auth" in service:
+            team = Team.SECURITY
+        elif "frontend" in service or "ui" in service:
+            team = Team.FRONTEND
+        elif "api" in service or "backend" in service:
+            team = Team.BACKEND
+        else:
+            team = Team.SRE
+        return category, team
 
     async def run(self, alert: AlertIngest, open_alerts: list[dict] | None = None) -> PipelineAgentResult:
         initial: PipelineState = {
@@ -216,12 +233,7 @@ class PipelineAgent:
                 stage_log=log,
             )
 
-        try:
-            category = AlertCategory(final.get("category", "other"))
-            team = Team(final.get("team", "sre"))
-        except ValueError:
-            category = AlertCategory.OTHER
-            team = Team.SRE
+        category, team = self._infer_category_team(final.get("alert") or alert.model_dump(mode="json"))
 
         return PipelineAgentResult(
             accepted=True,

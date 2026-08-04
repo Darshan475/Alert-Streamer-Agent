@@ -23,4 +23,6 @@ async def chat(
         alert_context_used=result.alert_context_used,
         actions=[a.model_dump() for a in result.actions],
         groups=result.groups,
+        tool_calls=result.tool_calls,
+        steps=result.steps,
     )

@@ -1,4 +1,4 @@
-"""Tool-using chat agent — groups alerts and batch approves via agent loop."""
+"""Tool-using pipeline agent — multi-step loop for ingest → validate → dedup → prioritize."""
 
 import json
 import logging
@@ -6,33 +6,35 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.schemas import AlertStatus, HumanReviewDecision, HumanReviewRequest, Team
+from app.models.schemas import AlertStatus
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline
 from app.services.alert_store import AlertStore
 from app.services.llm_client import LLMClient
-from app.services.review_actions import apply_human_review, batch_approve_alerts, group_alerts_by_service
+from app.services.review_actions import group_alerts_by_service
 
 logger = logging.getLogger(__name__)
 
-CHAT_AGENT_SYSTEM = """You are Alert Streamer AI — an autonomous SRE agent copilot with tools.
-You help operators investigate alerts, group related incidents, approve batches, and trigger new events.
+CHAT_AGENT_SYSTEM = """You are Alert Streamer AI — an autonomous pipeline agent.
+Your scope is ONLY the alert pipeline: Ingest → Validate → Deduplicate → Prioritize.
+There is NO human-in-the-loop. Alerts are fully processed by agents.
+
+You MUST work in multiple steps using tools — never answer from memory alone.
+1. Call tools to gather live data or run pipeline actions
+2. Synthesize results into a final reply after you have enough context
 
 Available tools (respond with JSON only):
-1. {"type":"tool","tool":"list_alerts","args":{"status":"pending_review|investigating|all"}}
-2. {"type":"tool","tool":"group_alerts","args":{"status":"pending_review"}}
-3. {"type":"tool","tool":"approve_group","args":{"alert_ids":["uuid",...],"assigned_to":"engineer","feedback":"..."}}
-4. {"type":"tool","tool":"approve_combined","args":{"group_key":"service/env","assigned_to":"engineer"}}
-5. {"type":"tool","tool":"generate_alert","args":{"hint":"optional scenario"}}
-6. {"type":"final","reply":"markdown message for user","actions":[{"type":"batch_approve","alert_ids":[],"label":"Approve group"}]}
+1. {"type":"tool","tool":"list_alerts","args":{"status":"all|prioritized|rejected","priority":null}}
+2. {"type":"tool","tool":"get_stats","args":{}}
+3. {"type":"tool","tool":"get_alert","args":{"alert_id":"uuid"}}
+4. {"type":"tool","tool":"group_alerts","args":{"status":"all|prioritized"}}
+5. {"type":"tool","tool":"generate_and_ingest","args":{"hint":"optional scenario"}}
+6. {"type":"final","reply":"markdown message","steps":["Validate","Deduplicate","Prioritize"]}
 
-Workflow for "approve grouped/combined alerts":
-- Call group_alerts to find related pending alerts
-- Summarize groups for the user
-- When user confirms, call approve_group or approve_combined
-- Include actions in final response so UI can show approve buttons
-
-Always use tools to fetch live data — never invent alert IDs. Be concise and actionable."""
+When ingesting or generating alerts, report which pipeline stages completed and the assigned priority.
+When summarizing, use get_stats and list_alerts first.
+Include "steps" in final responses listing agent actions you took (tool names or pipeline stages).
+Be concise and actionable. Never invent alert IDs."""
 
 
 class ChatAction(BaseModel):
@@ -47,12 +49,13 @@ class ChatAgentResult(BaseModel):
     actions: list[ChatAction] = Field(default_factory=list)
     groups: list[dict] = Field(default_factory=list)
     tool_calls: list[str] = Field(default_factory=list)
+    steps: list[str] = Field(default_factory=list)
 
 
 class ChatAgent:
-    """Multi-step agent loop with tool execution — not a single if-else chat call."""
+    """Multi-step agent loop with tool execution — not a single-shot chat call."""
 
-    MAX_STEPS = 6
+    MAX_STEPS = 8
 
     def __init__(
         self,
@@ -60,13 +63,11 @@ class ChatAgent:
         store: AlertStore,
         generator: AlertGeneratorAgent,
         pipeline: AlertPipeline,
-        run_investigation,
     ) -> None:
         self._llm = llm
         self._store = store
         self._generator = generator
         self._pipeline = pipeline
-        self._run_investigation = run_investigation
         self._last_groups: list[dict] = []
 
     async def reply(self, message: str, alert_id: UUID | None = None) -> ChatAgentResult:
@@ -83,7 +84,7 @@ class ChatAgent:
         stats = await self._store.stats()
         context_parts.append(
             f"Stream stats: {stats.total_alerts} alerts | "
-            f"needs review: {stats.by_status.get('pending_review', 0)} | "
+            f"prioritized: {stats.by_status.get('prioritized', 0)} | "
             f"by status: {stats.by_status}"
         )
 
@@ -95,10 +96,9 @@ class ChatAgent:
             },
         ]
 
-        actions: list[ChatAction] = []
         groups: list[dict] = []
 
-        for step in range(self.MAX_STEPS):
+        for _step in range(self.MAX_STEPS):
             raw = await self._llm.chat(messages, json_mode=True, temperature=0.3)
             try:
                 parsed = json.loads(raw)
@@ -116,30 +116,13 @@ class ChatAgent:
 
             if parsed.get("type") == "final" or "reply" in parsed and parsed.get("type") != "tool":
                 reply = parsed.get("reply", raw)
-                for act in parsed.get("actions") or []:
-                    actions.append(
-                        ChatAction(
-                            type=act.get("type", "batch_approve"),
-                            alert_ids=act.get("alert_ids") or [],
-                            label=act.get("label", "Approve"),
-                        )
-                    )
-                if not actions and self._last_groups:
-                    for g in self._last_groups:
-                        if g.get("count", 0) > 1:
-                            actions.append(
-                                ChatAction(
-                                    type="batch_approve",
-                                    alert_ids=g.get("alert_ids", []),
-                                    label=f"Approve {g['group_key']} ({g['count']} alerts)",
-                                )
-                            )
+                steps = parsed.get("steps") or tool_calls
                 return ChatAgentResult(
                     reply=reply,
                     alert_context_used=context_used,
-                    actions=actions,
                     groups=groups or self._last_groups,
                     tool_calls=tool_calls,
+                    steps=steps if isinstance(steps, list) else [str(steps)],
                 )
 
             tool = parsed.get("tool")
@@ -165,22 +148,26 @@ class ChatAgent:
             alert_context_used=context_used,
             groups=self._last_groups,
             tool_calls=tool_calls,
+            steps=tool_calls,
         )
 
     async def _execute_tool(self, tool: str | None, args: dict) -> object:
         if tool == "list_alerts":
             status = args.get("status", "all")
+            priority = args.get("priority")
             exclude = {AlertStatus.DUPLICATE}
             status_filter = None
-            if status == "pending_review":
-                status_filter = AlertStatus.PENDING_REVIEW
-            elif status == "investigating":
-                status_filter = AlertStatus.INVESTIGATING
+            if status == "prioritized":
+                status_filter = AlertStatus.PRIORITIZED
+            elif status == "rejected":
+                status_filter = AlertStatus.REJECTED
             items, total = await self._store.list_alerts(
                 status=status_filter,
                 limit=20,
                 exclude_statuses=exclude if status == "all" else None,
             )
+            if priority is not None:
+                items = [a for a in items if a.priority == int(priority)]
             return {
                 "total": total,
                 "alerts": [
@@ -190,43 +177,56 @@ class ChatAgent:
                         "priority": a.priority,
                         "status": a.status.value,
                         "service": a.service,
+                        "pipeline_stages": [
+                            s.get("stage")
+                            for s in (a.metadata or {}).get("pipeline_agent_log", [])
+                            if isinstance(s, dict)
+                        ],
                     }
                     for a in items
                 ],
             }
 
+        if tool == "get_stats":
+            stats = await self._store.stats()
+            return {
+                "total_alerts": stats.total_alerts,
+                "by_status": stats.by_status,
+                "by_priority": stats.by_priority,
+                "by_team": stats.by_team,
+            }
+
+        if tool == "get_alert":
+            alert_id = args.get("alert_id")
+            if not alert_id:
+                return {"error": "alert_id required"}
+            try:
+                alert = await self._store.get(UUID(str(alert_id)))
+            except ValueError:
+                return {"error": "invalid alert_id"}
+            if not alert:
+                return {"error": "alert not found"}
+            return {
+                "id": str(alert.id),
+                "title": alert.title,
+                "priority": alert.priority,
+                "status": alert.status.value,
+                "service": alert.service,
+                "team": alert.team.value,
+                "pipeline_stages": [
+                    s.get("stage")
+                    for s in (alert.metadata or {}).get("pipeline_agent_log", [])
+                    if isinstance(s, dict)
+                ],
+            }
+
         if tool == "group_alerts":
-            status = args.get("status", "pending_review")
-            status_filter = AlertStatus.PENDING_REVIEW
-            if status == "investigating":
-                status_filter = AlertStatus.INVESTIGATING
+            status = args.get("status", "all")
+            status_filter = AlertStatus.PRIORITIZED if status == "prioritized" else None
             items, _ = await self._store.list_alerts(status=status_filter, limit=50)
             return group_alerts_by_service(items)
 
-        if tool == "approve_group":
-            ids = [UUID(i) for i in args.get("alert_ids", [])]
-            return await batch_approve_alerts(
-                self._store,
-                ids,
-                reviewer=args.get("reviewer", "chat-agent"),
-                assigned_to=args.get("assigned_to", "on-call-engineer"),
-                feedback=args.get("feedback", "Approved via chat agent"),
-            )
-
-        if tool == "approve_combined":
-            group_key = args.get("group_key", "")
-            matching = [g for g in self._last_groups if g.get("group_key") == group_key]
-            if not matching:
-                return {"error": f"No group found for key {group_key}"}
-            ids = [UUID(i) for i in matching[0].get("alert_ids", [])]
-            return await batch_approve_alerts(
-                self._store,
-                ids,
-                assigned_to=args.get("assigned_to", "on-call-engineer"),
-                feedback=args.get("feedback", f"Combined approve: {group_key}"),
-            )
-
-        if tool == "generate_alert":
+        if tool == "generate_and_ingest":
             recent_items, _ = await self._store.list_alerts(limit=10)
             recent_titles = [a.title for a in recent_items]
             alert = await self._generator.generate(
@@ -236,13 +236,18 @@ class ChatAgent:
             response, record = await self._pipeline.process(alert, store=self._store)
             if response.accepted and record:
                 await self._store.save(record)
-                import asyncio
-
-                asyncio.create_task(self._run_investigation(record.id))
+                stages = [
+                    s.get("stage")
+                    for s in (record.metadata or {}).get("pipeline_agent_log", [])
+                    if isinstance(s, dict)
+                ]
                 return {
                     "accepted": True,
                     "alert_id": str(record.id),
                     "title": record.title,
+                    "priority": record.priority,
+                    "status": record.status.value,
+                    "pipeline_stages": stages or ["validate", "deduplicate", "prioritize"],
                     "message": response.message,
                 }
             return {"accepted": False, "message": response.message}
@@ -251,12 +256,14 @@ class ChatAgent:
 
     @staticmethod
     def _format_alert(alert) -> str:
-        inv = alert.investigation
-        inv_text = ""
-        if inv:
-            inv_text = f"Investigation: {inv.root_cause} | Urgency {inv.urgency_score}/10"
+        stages = [
+            s.get("stage")
+            for s in (alert.metadata or {}).get("pipeline_agent_log", [])
+            if isinstance(s, dict)
+        ]
+        stage_text = " → ".join(stages) if stages else "pending"
         return (
             f"Selected alert: {alert.title} (ID: {alert.id})\n"
             f"P{alert.priority} {alert.severity.value} | {alert.service} | {alert.status.value}\n"
-            f"{inv_text}"
+            f"Pipeline stages: {stage_text}"
         )

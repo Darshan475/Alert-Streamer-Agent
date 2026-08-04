@@ -56,11 +56,6 @@ export function AlertList({ alerts, selectedId, onSelect }: Props) {
                 <span className={`text-xs capitalize ${statusColor(alert.status)}`}>
                   {alert.status.replace("_", " ")}
                 </span>
-                {alert.status === "pending_review" && (
-                  <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-300 uppercase tracking-wide">
-                    HITL
-                  </span>
-                )}
               </div>
               <h3 className="font-medium text-white truncate">{alert.title}</h3>
               <p className="text-sm text-slate-400 mt-1 line-clamp-1">{alert.description}</p>

@@ -19,6 +19,7 @@ async def seed_demo_alerts(
     max_alerts: int = 6,
 ) -> int:
     """Agent-generates demo alerts if the store is empty."""
+    _ = run_investigation  # kept for API compat; pipeline-only mode skips investigation
     _, total = await store.list_alerts(limit=1)
     if total > 0:
         return 0
@@ -32,7 +33,6 @@ async def seed_demo_alerts(
         if not response.accepted or record is None:
             continue
         await store.save(record)
-        asyncio.create_task(run_investigation(record.id))
         recent_titles.append(record.title)
         seeded += 1
 

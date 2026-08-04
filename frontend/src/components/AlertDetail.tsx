@@ -18,8 +18,8 @@ export function AlertDetail({ alert, onReviewComplete, onToast }: Props) {
   if (!alert) {
     return (
       <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-900/20 p-8 text-center text-slate-500 min-h-[280px] flex flex-col items-center justify-center gap-2">
-        <p>Select an alert to validate and review</p>
-        <p className="text-xs text-slate-600">Approve · Reject · Escalate for human-in-the-loop</p>
+        <p>Select an alert to view pipeline details</p>
+        <p className="text-xs text-slate-600">Ingest → Validate → Deduplicate → Prioritize</p>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-"""Alert pipeline — delegates all stages to PipelineAgent; mechanical helpers only."""
+"""Alert pipeline — validate → dedup → prioritize (no HITL)."""
 
 import hashlib
 import json
@@ -48,7 +48,7 @@ def build_alert_record(
     *,
     stage_log: list | None = None,
     extra_metadata: dict | None = None,
-    status: AlertStatus = AlertStatus.ASSIGNED,
+    status: AlertStatus = AlertStatus.PRIORITIZED,
 ) -> AlertRecord:
     now = datetime.now(UTC)
     metadata = {**(alert.metadata or {}), **(extra_metadata or {})}
@@ -82,7 +82,7 @@ def build_alert_record(
 
 
 class AlertPipeline:
-    """AI pipeline agent orchestrates validate → dedup → prioritize → assign."""
+    """AI pipeline agent orchestrates validate → dedup → prioritize."""
 
     def __init__(self, dedup_store: "DedupStore", pipeline_agent: "PipelineAgent | None" = None) -> None:
         self._dedup = dedup_store
@@ -184,8 +184,8 @@ class AlertPipeline:
             AlertIngestResponse(
                 accepted=True,
                 alert_id=record.id,
-                status=AlertStatus.ASSIGNED,
-                message=f"Agent pipeline ({stages}): {result.team.value} P{result.priority}",
+                status=AlertStatus.PRIORITIZED,
+                message=f"Agent pipeline ({stages}): P{result.priority} — {result.team.value}",
             ),
             record,
         )

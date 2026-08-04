@@ -65,7 +65,6 @@ async def generate_alert(
     response, record = await pipeline.process(alert, store=store)
     if response.accepted and record:
         await store.save(record)
-        background_tasks.add_task(_run_investigation, record.id)
     return GenerateAlertResponse(alert=alert, ingest=response)
 
 
@@ -88,7 +87,6 @@ async def auto_stream(
         results.append(response)
         if response.accepted and record:
             await store.save(record)
-            background_tasks.add_task(_run_investigation, record.id)
             recent_titles.append(record.title)
 
     return AutoStreamResponse(

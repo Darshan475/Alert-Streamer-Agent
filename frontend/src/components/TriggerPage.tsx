@@ -326,7 +326,7 @@ export function TriggerPage() {
             </div>
 
             <p className="shrink-0 text-[10px] text-slate-600 truncate">
-              Agent pipeline: generate → triage agent → investigate → route → human review · {API_BASE}/api/v1/agents
+              Agent pipeline: ingest → validate → deduplicate → prioritize · {API_BASE}/api/v1/agents
             </p>
           </div>
         </div>

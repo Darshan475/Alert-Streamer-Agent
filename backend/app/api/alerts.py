@@ -75,18 +75,16 @@ async def _run_investigation(alert_id: UUID) -> None:
 @router.post("/ingest", response_model=AlertIngestResponse, status_code=status.HTTP_202_ACCEPTED)
 async def ingest_alert(
     payload: AlertIngest,
-    background_tasks: BackgroundTasks,
     _: str = Depends(verify_api_key),
     pipeline: AlertPipeline = Depends(get_pipeline),
     store: AlertStore = Depends(get_store),
 ) -> AlertIngestResponse:
-    """Receive alert, validate, deduplicate, prioritize, assign team, and queue investigation."""
+    """Receive alert and run the agent pipeline: validate → deduplicate → prioritize."""
     response, record = await pipeline.process(payload, store=store)
     if not response.accepted or record is None:
         return response
 
     await store.save(record)
-    background_tasks.add_task(_run_investigation, record.id)
     return response
 
 

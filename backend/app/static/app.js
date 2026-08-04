@@ -2,14 +2,12 @@ const API = "";
 
 const FILTERS = [
   { id: "all", label: "All" },
-  { id: "pending_review", label: "Needs Review (P1/P2)" },
-  { id: "investigating", label: "Investigating" },
-  { id: "escalated", label: "Escalated" },
-  { id: "resolved", label: "Resolved" },
+  { id: "prioritized", label: "Prioritized" },
   { id: "rejected", label: "Rejected" },
+  { id: "resolved", label: "Resolved" },
 ];
 
-const STAGES = ["Ingest", "Validate", "Dedup", "Prioritize", "Assign", "Investigate", "Review", "Resolve"];
+const STAGES = ["Ingest", "Validate", "Dedup", "Prioritize"];
 
 const state = {
   alerts: [],
@@ -38,8 +36,8 @@ function showToast(msg) {
 function statusStage(status) {
   const map = {
     received: 0, validated: 1, deduplicated: 2, duplicate: 2, rejected: 2,
-    prioritized: 3, assigned: 4, investigating: 5, pending_review: 6,
-    escalated: 6, resolved: 7,
+    prioritized: 3, assigned: 3, investigating: 3, pending_review: 3,
+    escalated: 3, resolved: 3,
   };
   return map[status] ?? 0;
 }
@@ -51,8 +49,8 @@ function renderStats() {
   const teams = Object.keys(s.by_team || {}).length;
   row.innerHTML = [
     ["Total Alerts", s.total_alerts],
-    ["Investigating", s.by_status?.investigating ?? 0],
-    ["Resolved", s.by_status?.resolved ?? 0],
+    ["Prioritized", s.by_status?.prioritized ?? 0],
+    ["Rejected", s.by_status?.rejected ?? 0],
     ["Teams Active", teams],
   ].map(([label, value]) => `
     <div class="stat-card"><span>${label}</span><strong>${value}</strong></div>
@@ -77,6 +75,9 @@ function renderFilters() {
 
 function filteredAlerts() {
   if (state.statusFilter === "all") return state.alerts;
+  if (state.statusFilter === "prioritized") {
+    return state.alerts.filter((a) => a.status === "prioritized" || a.status === "assigned");
+  }
   return state.alerts.filter((a) => a.status === state.statusFilter);
 }
 
@@ -96,7 +97,7 @@ function renderAlertList() {
         <span class="badge badge-${a.severity}">${a.severity}</span>
         <span>P${a.priority}</span>
         <span>${a.team}</span>
-        ${a.status === "pending_review" ? '<span class="badge badge-pending">review</span>' : `<span>${a.status.replace("_", " ")}</span>`}
+        <span>${a.status.replace("_", " ")}</span>
       </div>
     </button>
   `).join("");
@@ -139,27 +140,13 @@ function renderDetail() {
   }
 
   let reviewHtml = "";
-  if (alert.human_review && alert.status !== "escalated") {
-    const hr = alert.human_review;
-    const auto = hr.reviewer === "system-auto-resolve";
-    reviewHtml = `<div class="review-panel ${auto ? "auto" : "human"}">
-      <strong>${auto ? "Auto-Resolved" : `Human Review — ${hr.decision}`}</strong>
-      <p style="font-size:0.875rem;color:#94a3b8">${auto ? "Resolved by pipeline policy" : `Reviewer: ${esc(hr.reviewer)}`}</p>
-      ${hr.feedback ? `<p style="font-size:0.875rem;color:#94a3b8;border-left:2px solid #475569;padding-left:0.75rem">${esc(hr.feedback)}</p>` : ""}
-    </div>`;
-  } else if (["pending_review", "investigating", "escalated"].includes(alert.status)) {
-    reviewHtml = `<div class="review-panel human">
-      <strong style="color:#fcd34d">Human-in-the-Loop Review</strong>
-      <p style="font-size:0.75rem;color:#94a3b8">P1/P2 alerts require your approval.</p>
-      <label style="font-size:0.75rem;color:#64748b">Reviewer</label>
-      <input id="reviewer" value="on-call-engineer" />
-      <label style="font-size:0.75rem;color:#64748b">Feedback</label>
-      <textarea id="feedback" rows="2" placeholder="Optional notes…"></textarea>
-      <div class="review-actions">
-        <button type="button" class="btn-approve" data-decision="approve">Approve</button>
-        <button type="button" class="btn-reject" data-decision="reject">Reject</button>
-        <button type="button" class="btn-escalate" data-decision="escalate">Escalate</button>
-      </div>
+  const log = alert.metadata?.pipeline_agent_log;
+  if (Array.isArray(log) && log.length) {
+    reviewHtml = `<div class="review-panel auto">
+      <strong style="color:#67e8f9">Agent Pipeline Log</strong>
+      <ul style="font-size:0.875rem;color:#94a3b8;margin:0.5rem 0;padding-left:1rem">
+        ${log.map((e) => `<li><span style="color:#6ee7b7">${esc(e.stage)}</span>${e.reasoning ? " — " + esc(e.reasoning) : ""}</li>`).join("")}
+      </ul>
     </div>`;
   }
 
@@ -175,25 +162,6 @@ function renderDetail() {
     <p style="font-size:0.875rem;color:#64748b">${alert.service} · ${alert.environment} · ${alert.team}</p>
     ${invHtml}${reviewHtml}
   `;
-
-  box.querySelectorAll(".review-actions button").forEach((btn) => {
-    btn.onclick = async () => {
-      try {
-        await api(`/api/v1/alerts/${alert.id}/human-review`, {
-          method: "POST",
-          body: JSON.stringify({
-            decision: btn.dataset.decision,
-            reviewer: document.getElementById("reviewer").value,
-            feedback: document.getElementById("feedback").value,
-          }),
-        });
-        showToast(`Alert ${btn.dataset.decision}d`);
-        await refresh();
-      } catch (e) {
-        showToast(e.message);
-      }
-    };
-  });
 }
 
 async function loadLlm() {
@@ -269,7 +237,7 @@ document.getElementById("chat-close").onclick = () => chatModal.classList.add("h
 document.querySelector(".chat-backdrop").onclick = () => chatModal.classList.add("hidden");
 
 const chatMessages = document.getElementById("chat-messages");
-chatMessages.innerHTML = `<div class="chat-msg bot">Hi! Ask about alerts, investigations, or human-review steps.</div>`;
+chatMessages.innerHTML = `<div class="chat-msg bot">Hi! I'm the pipeline agent — ingest, validate, deduplicate, prioritize.</div>`;
 
 document.getElementById("chat-form").onsubmit = async (e) => {
   e.preventDefault();
