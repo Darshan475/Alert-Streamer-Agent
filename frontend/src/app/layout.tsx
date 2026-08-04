@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alert Streamer | Nemotron Incident Dashboard",
-  description: "Real-time alert pipeline visualization with LLM-powered investigation",
+  title: "Alert Streamer | Real-Time Incident Monitor",
+  description: "Trigger monitoring events and validate alerts with LLM-powered investigation",
 };
 
 export default function RootLayout({

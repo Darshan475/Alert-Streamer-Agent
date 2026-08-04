@@ -69,6 +69,32 @@ export interface AlertRecord {
   human_review?: HumanReview | null;
 }
 
+export interface AlertIngest {
+  source: string;
+  alert_type: string;
+  title: string;
+  description: string;
+  severity: AlertSeverity;
+  service: string;
+  environment: string;
+  metric_value?: number | null;
+  threshold?: number | null;
+  hostname?: string | null;
+  namespace?: string | null;
+  pod_name?: string | null;
+  region?: string | null;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface AlertIngestResponse {
+  accepted: boolean;
+  alert_id: string | null;
+  status: AlertStatus;
+  message: string;
+  duplicate_of: string | null;
+}
+
 export interface AlertListResponse {
   total: number;
   items: AlertRecord[];

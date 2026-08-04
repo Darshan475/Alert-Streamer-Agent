@@ -1,4 +1,6 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_KEY =
+  process.env.NEXT_PUBLIC_ALERT_STREAMER_API_KEY || "dev-secret-change-in-production";
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -13,6 +15,16 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(text || `Request failed: ${res.status}`);
   }
   return res.json();
+}
+
+export async function ingestAlert(
+  payload: import("./types").AlertIngest
+): Promise<import("./types").AlertIngestResponse> {
+  return fetchJson("/api/v1/alerts/ingest", {
+    method: "POST",
+    headers: { "X-API-Key": API_KEY },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function getAlerts(params?: {

@@ -1,3 +1,5 @@
-"use client";
+import { redirect } from "next/navigation";
 
-export { DashboardPage as default } from "@/components/DashboardPage";
+export default function Home() {
+  redirect("/alerts");
+}
