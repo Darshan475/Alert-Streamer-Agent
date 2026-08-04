@@ -1,9 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "app/main.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{.venv/**,**/__pycache__/**,scripts/**,tests/**,**/*.db,.env}"
+  "services": {
+    "web": {
+      "root": ".",
+      "entrypoint": "app.main:app",
+      "functions": {
+        "app/main.py": {
+          "maxDuration": 60,
+          "excludeFiles": "{.venv/**,**/__pycache__/**,scripts/**,tests/**,**/*.db,.env}"
+        }
+      }
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
 }

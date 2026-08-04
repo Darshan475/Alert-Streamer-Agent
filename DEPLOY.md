@@ -20,15 +20,15 @@ Deploy as **two Vercel projects** from the same GitHub repo.
    GEMINI_API_KEY=your_key_from_aistudio.google.com/apikey
    LLM_PROVIDER=gemini
    SEED_DEMO_ALERTS=true
-   CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:3000
+   CORS_ORIGINS=https://alert-streamer-frontend.vercel.app,http://localhost:3000
    ```
 
 4. Deploy — config lives in `backend/vercel.json` and `backend/pyproject.toml`
 
 | URL | Purpose |
 |-----|---------|
-| `https://<backend-project>.vercel.app` | API + built-in dashboard |
-| `https://<backend-project>.vercel.app/health` | Health check |
+| `https://alert-streamer-backend.vercel.app` | API + built-in dashboard |
+| `https://alert-streamer-backend.vercel.app/health` | Health check |
 
 ### 2. Frontend (Next.js)
 
@@ -36,14 +36,14 @@ Deploy as **two Vercel projects** from the same GitHub repo.
 2. Environment variable:
 
    ```
-   NEXT_PUBLIC_API_URL=https://<backend-project>.vercel.app
+   NEXT_PUBLIC_API_URL=https://alert-streamer-backend.vercel.app
    ```
 
 3. Deploy — config lives in `frontend/vercel.json`
 
 | URL | Purpose |
 |-----|---------|
-| `https://<frontend-project>.vercel.app` | React dashboard |
+| `https://alert-streamer-frontend.vercel.app` | React dashboard |
 
 ### 3. Wire CORS
 
