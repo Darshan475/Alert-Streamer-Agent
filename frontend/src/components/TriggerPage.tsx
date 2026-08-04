@@ -30,26 +30,12 @@ interface StreamEvent {
   severity: string;
 }
 
-const FORMAT_EXAMPLES = [
-  "Warn: [P3][PSS BWS]LOW SQS MESSAGE VOLUME DETECTED_propertyupdate",
-  "Triggered: [P3][PSS BWS] /whgservices/loyalty/v4/member/promotionregistertoken 5xx error rate- Prod - Tally digitalpromosmiscservices-prd",
-];
-
-const severityColors: Record<string, string> = {
-  critical: "text-red-400 bg-red-500/15 border-red-500/30",
-  high: "text-orange-400 bg-orange-500/15 border-orange-500/30",
-  medium: "text-amber-400 bg-amber-500/15 border-amber-500/30",
-  low: "text-blue-400 bg-blue-500/15 border-blue-500/30",
-  info: "text-slate-400 bg-slate-500/15 border-slate-500/30",
-};
-
 function alertRowMeta(alert: AlertIngest) {
   const meta = alert.metadata ?? {};
   return {
     id: String(meta.incident_id ?? "—"),
     date: String(meta.opened_date ?? new Date().toLocaleDateString()),
     priority: String(meta.priority_label ?? "3-Medium"),
-    platform: String(meta.platform ?? "Pss Bws"),
     monitor: String(meta.monitor ?? alert.source ?? "Datadog"),
   };
 }
@@ -177,10 +163,10 @@ export function TriggerPage() {
 
   return (
     <AppShell subtitle="PSS BWS · Datadog alert generation" showControls>
-      <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
+      <div className="relative h-full max-w-7xl mx-auto w-full px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:gap-4 overflow-hidden">
         <LoadingOverlay show={generating && !streaming} label="Generating PSS BWS alert…" />
 
-        <div className="shrink-0 grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <div className="shrink-0 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <MetricCard
             label="Backend"
             value={backendOk === null ? "…" : backendOk ? "Connected" : "Offline"}
@@ -194,138 +180,109 @@ export function TriggerPage() {
           <MetricCard label="Agent Gen" value={String(generated.length)} icon={Bot} color="text-purple-400" />
         </div>
 
-        <div className="flex-1 min-h-0 grid lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-5 flex flex-col min-h-0 gap-3">
-            <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-violet-300">
-                <Sparkles className="h-4 w-4" />
-                <span className="text-sm font-medium">Alert Generator Agent</span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Generates PSS BWS P3 alerts in Datadog incident format — validate → dedup → prioritize.
-              </p>
-              <div className="rounded-lg border border-slate-800 bg-[#070a12] p-2 space-y-1">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wide">Alert format</p>
-                {FORMAT_EXAMPLES.map((line) => (
-                  <p key={line} className="text-[10px] text-slate-400 font-mono leading-relaxed break-all">
-                    {line}
-                  </p>
+        <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-3 sm:p-4 space-y-3">
+          <div className="flex items-center gap-2 text-violet-300">
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span className="text-sm font-medium">Alert Generator Agent</span>
+          </div>
+          <input
+            value={hint}
+            onChange={(e) => setHint(e.target.value)}
+            placeholder="Optional hint (e.g. SQS volume, API 5xx…)"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              Count
+              <select
+                value={streamCount}
+                onChange={(e) => setStreamCount(Number(e.target.value))}
+                disabled={streaming}
+                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+              >
+                {[3, 5, 8, 10].map((n) => (
+                  <option key={n} value={n}>{n}</option>
                 ))}
-              </div>
-              <input
-                value={hint}
-                onChange={(e) => setHint(e.target.value)}
-                placeholder="Optional hint (e.g. SQS volume, API 5xx on loyalty endpoint…)"
-                className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-1.5 text-xs text-slate-500">
-                  Count
-                  <select
-                    value={streamCount}
-                    onChange={(e) => setStreamCount(Number(e.target.value))}
-                    disabled={streaming}
-                    className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
-                  >
-                    {[3, 5, 8, 10].map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex items-center gap-1.5 text-xs text-slate-500">
-                  Delay
-                  <select
-                    value={delayMs}
-                    onChange={(e) => setDelayMs(Number(e.target.value))}
-                    disabled={streaming}
-                    className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
-                  >
-                    <option value={0}>Instant</option>
-                    <option value={500}>500ms</option>
-                    <option value={800}>800ms</option>
-                    <option value={1500}>1.5s</option>
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => void generateAndIngest()}
-                  disabled={generating || streaming || backendOk === false}
-                  className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
-                >
-                  <Bot className="h-3 w-3" />
-                  Generate One
-                </button>
-                {streaming ? (
-                  <button
-                    type="button"
-                    onClick={stopStream}
-                    className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300"
-                  >
-                    <Square className="h-3 w-3" />
-                    Stop
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void autoStream()}
-                    disabled={backendOk === false}
-                    className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
-                  >
-                    <Play className="h-3 w-3" />
-                    Auto Stream
-                  </button>
-                )}
-              </div>
-            </div>
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              Delay
+              <select
+                value={delayMs}
+                onChange={(e) => setDelayMs(Number(e.target.value))}
+                disabled={streaming}
+                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+              >
+                <option value={0}>Instant</option>
+                <option value={500}>500ms</option>
+                <option value={800}>800ms</option>
+                <option value={1500}>1.5s</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void generateAndIngest()}
+              disabled={generating || streaming || backendOk === false}
+              className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
+            >
+              <Bot className="h-3 w-3" />
+              Generate One
+            </button>
+            {streaming ? (
+              <button
+                type="button"
+                onClick={stopStream}
+                className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300"
+              >
+                <Square className="h-3 w-3" />
+                Stop
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void autoStream()}
+                disabled={backendOk === false}
+                className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
+              >
+                <Play className="h-3 w-3" />
+                Auto Stream
+              </button>
+            )}
+          </div>
+        </div>
 
-            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-              Generated Preview
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          <div className="flex flex-col min-h-[220px] lg:min-h-0 gap-2">
+            <h2 className="shrink-0 text-sm font-medium text-slate-400 uppercase tracking-wider">
+              Generated Preview ({generated.length})
             </h2>
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 scroll-panel">
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 scroll-panel space-y-2">
               {generated.length === 0 ? (
-                <p className="text-xs text-slate-600 text-center py-8">
-                  No alerts yet — click Generate One or Auto Stream
+                <p className="text-sm text-slate-500 text-center py-10 border border-dashed border-slate-700 rounded-xl">
+                  No alerts yet — click Generate One
                 </p>
               ) : (
-                <div className="rounded-lg border border-slate-700/60 overflow-hidden">
-                  <div className="grid grid-cols-[4.5rem_4.5rem_5rem_1fr_4rem] gap-1 bg-slate-800/80 px-2 py-1.5 text-[9px] uppercase tracking-wide text-slate-500">
-                    <span>ID</span>
-                    <span>Date</span>
-                    <span>Priority</span>
-                    <span>Alert</span>
-                    <span>Tool</span>
-                  </div>
-                  {generated.map((alert, i) => {
-                    const row = alertRowMeta(alert);
-                    return (
-                      <div
-                        key={`${alert.title}-${i}`}
-                        className="grid grid-cols-[4.5rem_4.5rem_5rem_1fr_4rem] gap-1 border-t border-slate-800/60 px-2 py-2 text-[10px] hover:bg-slate-900/40"
-                      >
-                        <span className="text-cyan-400 font-mono">{row.id}</span>
-                        <span className="text-slate-400">{row.date}</span>
-                        <span className="text-amber-300 truncate">{row.priority}</span>
-                        <span className="text-slate-200 truncate" title={alert.title}>{alert.title}</span>
-                        <span className="text-slate-500 truncate">{row.monitor}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                generated.map((alert, i) => {
+                  const row = alertRowMeta(alert);
+                  return (
+                    <GeneratedPreviewCard key={`${row.id}-${i}`} alert={alert} row={row} />
+                  );
+                })
               )}
             </div>
           </div>
 
-          <div className="lg:col-span-7 flex flex-col min-h-0 gap-3">
-            <div className="shrink-0 flex items-center justify-between">
+          <div className="flex flex-col min-h-[220px] lg:min-h-0 gap-2">
+            <div className="shrink-0 flex items-center justify-between gap-2">
               <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
                 Live Event Stream
                 {streaming && <Loader2 className="h-3.5 w-3.5 text-cyan-400 animate-spin" />}
               </h2>
               <Link
                 href="/alerts"
-                className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                className="flex items-center gap-1.5 text-xs text-cyan-400 hover:text-cyan-300 transition-colors shrink-0"
               >
-                Review pipeline
+                Review
                 <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
@@ -335,17 +292,17 @@ export function TriggerPage() {
               className="flex-1 min-h-0 overflow-y-auto rounded-xl border border-slate-800 bg-[#070a12] font-mono text-xs p-3 space-y-1 scroll-panel"
             >
               {events.length === 0 ? (
-                <p className="text-slate-600 text-center py-12">
-                  Click <span className="text-cyan-500">Generate One</span> to create a PSS BWS alert
+                <p className="text-slate-500 text-center py-10 text-sm">
+                  Click <span className="text-cyan-400">Generate One</span> to start
                 </p>
               ) : (
                 events.map((ev) => (
-                  <div key={ev.id} className="flex gap-2 leading-relaxed hover:bg-slate-900/40 px-1 rounded">
-                    <span className="text-slate-600 shrink-0">
+                  <div key={ev.id} className="flex flex-wrap sm:flex-nowrap gap-x-2 gap-y-0.5 leading-relaxed hover:bg-slate-900/40 px-1 rounded py-0.5">
+                    <span className="text-slate-500 shrink-0">
                       {ev.ts.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                     </span>
                     <span
-                      className={`shrink-0 uppercase font-semibold w-16 ${
+                      className={`shrink-0 uppercase font-semibold ${
                         ev.status === "accepted"
                           ? "text-emerald-400"
                           : ev.status === "duplicate"
@@ -357,17 +314,11 @@ export function TriggerPage() {
                     >
                       {ev.status}
                     </span>
-                    <span className="text-slate-500 shrink-0">[{ev.source}]</span>
-                    <span className="text-slate-300 truncate">{ev.title}</span>
-                    <span className="text-slate-600 truncate hidden sm:inline">— {ev.message}</span>
+                    <span className="text-slate-200 break-words min-w-0 flex-1">{ev.title}</span>
                   </div>
                 ))
               )}
             </div>
-
-            <p className="shrink-0 text-[10px] text-slate-600 truncate">
-              Pipeline: validate → deduplicate → prioritize · {API_BASE}/api/v1/agents/generate-alert
-            </p>
           </div>
         </div>
       </div>
@@ -376,6 +327,41 @@ export function TriggerPage() {
         <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
       )}
     </AppShell>
+  );
+}
+
+function GeneratedPreviewCard({
+  alert,
+  row,
+}: {
+  alert: AlertIngest;
+  row: ReturnType<typeof alertRowMeta>;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-3 sm:p-4 space-y-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div>
+          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">ID</span>
+          <span className="text-cyan-400 font-mono text-sm">{row.id}</span>
+        </div>
+        <div>
+          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">Date</span>
+          <span className="text-slate-200 text-sm">{row.date}</span>
+        </div>
+        <div>
+          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">Priority</span>
+          <span className="text-amber-300 text-sm">{row.priority}</span>
+        </div>
+        <div>
+          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">Tool</span>
+          <span className="text-slate-200 text-sm">{row.monitor}</span>
+        </div>
+      </div>
+      <p className="text-sm sm:text-base text-white leading-snug break-words">{alert.title}</p>
+      {alert.description && alert.description !== alert.title && (
+        <p className="text-xs text-slate-400 line-clamp-2">{alert.description}</p>
+      )}
+    </div>
   );
 }
 
@@ -391,12 +377,12 @@ function MetricCard({
   color: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-3">
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 p-2.5 sm:p-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] text-slate-500 uppercase tracking-wide">{label}</span>
         <Icon className={`h-3.5 w-3.5 ${color}`} />
       </div>
-      <p className={`mt-1 text-lg font-semibold ${color}`}>{value}</p>
+      <p className={`mt-1 text-base sm:text-lg font-semibold truncate ${color}`}>{value}</p>
     </div>
   );
 }
