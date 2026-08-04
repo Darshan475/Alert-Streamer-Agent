@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 
 from app.config import (
     DEFAULT_LLM_PROVIDER,
-    DEFAULT_NEMOTRON_MODEL,
     LLMProvider,
     LLM_PROVIDER_META,
     OPENROUTER_MODELS,
@@ -93,10 +92,7 @@ async def set_llm_provider(body: SetLlmProviderRequest):
 
     client = get_llm_client()
     client.set_provider(body.provider)
-    if body.provider == "openrouter":
-        client.set_model(DEFAULT_NEMOTRON_MODEL)
-    else:
-        client.set_model(client.model_for(body.provider))
+    client.set_model(client.model_for(body.provider))
     meta = LLM_PROVIDER_META[body.provider]
     configured = client.is_configured_for(body.provider)
 

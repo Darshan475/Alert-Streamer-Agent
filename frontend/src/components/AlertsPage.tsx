@@ -3,19 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertList } from "@/components/AlertList";
-import { AlertDetail } from "@/components/AlertDetail";
+import { AlertDetailFullscreenModal } from "@/components/AlertDetailFullscreenModal";
 import { AppShell } from "@/components/AppShell";
 import { StatsCards } from "@/components/StatsCards";
-import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Pagination } from "@/components/Pagination";
 import { StatusFilterTabs } from "@/components/StatusFilterTabs";
 import { Toast } from "@/components/Toast";
 import { useAlertStream } from "@/hooks/useAlertStream";
 import { useHealth } from "@/hooks/useAlerts";
 import { computeFilterCounts, filterAlerts, type FilterId } from "@/lib/alertFilters";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 8;
 
 export function AlertsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,8 +41,10 @@ export function AlertsPage() {
     return filteredAlerts.slice(start, start + PAGE_SIZE);
   }, [filteredAlerts, page]);
 
-  const selectedAlert = alerts.find((a) => a.id === selectedId) ?? null;
-  const showLoader = isLoading;
+  const selectedAlert = useMemo(
+    () => alerts.find((a) => a.id === selectedId) ?? null,
+    [alerts, selectedId]
+  );
 
   useEffect(() => {
     setPage(1);
@@ -56,58 +57,60 @@ export function AlertsPage() {
   return (
     <AppShell
       subtitle="Agent Pipeline — Ingest · Validate · Dedup · Prioritize"
-      live
+      live={connected}
       onRefresh={silentRefresh}
       onLlmChanged={(message) => {
         void mutateHealth();
         setToast({ message, type: "success" });
       }}
     >
-      <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-        <LoadingOverlay show={showLoader} label={connected ? "Syncing alert stream…" : "Connecting to stream…"} />
+      <div className="relative h-full max-w-5xl mx-auto w-full px-4 py-4 flex flex-col gap-3">
+        {isLoading && (
+          <div className="shrink-0 flex items-center gap-2 text-xs text-slate-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+            Loading alerts…
+          </div>
+        )}
 
-        {error && (
-          <div className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-300 text-sm">
-            Cannot connect to alert stream at {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}.
-            {connected ? "" : " WebSocket connection failed — retrying…"}
+        {error && !isLoading && (
+          <div className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-amber-200 text-xs">
+            Stream reconnecting — showing cached data.
           </div>
         )}
 
         <StatsCards stats={stats} alertCount={filterCounts.all} />
 
-        <div className="flex-1 min-h-0 grid lg:grid-cols-12 lg:grid-rows-[auto_auto_1fr_auto] gap-x-4 gap-y-2">
-          <h2 className="lg:col-span-7 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end leading-none pb-0.5">
-            Alert Stream ({filteredAlerts.length})
-          </h2>
-          <h2 className="lg:col-span-5 lg:row-start-1 text-sm font-medium text-slate-400 uppercase tracking-wider self-end leading-none pb-0.5">
-            Pipeline Details
-          </h2>
+        <div className="flex-1 min-h-0 flex flex-col gap-2">
+          <div className="shrink-0 flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+              Alert Stream ({filteredAlerts.length})
+            </h2>
+            <Link
+              href="/trigger"
+              className="flex items-center gap-1.5 text-xs text-cyan-400/80 hover:text-cyan-300 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Trigger events
+            </Link>
+          </div>
 
-          <div className="lg:col-span-7 lg:row-start-2 min-h-[2.25rem] flex items-end">
+          <div className="shrink-0 min-h-[2.25rem] flex items-end">
             <StatusFilterTabs
               active={statusFilter}
               counts={filterCounts}
               onChange={setStatusFilter}
             />
           </div>
-          <div className="hidden lg:block lg:col-span-5 lg:row-start-2 min-h-[2.25rem]" aria-hidden />
 
-          <div className="lg:col-span-7 lg:row-start-3 min-h-0 overflow-y-auto pr-1 scroll-panel">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 scroll-panel">
             <AlertList
               alerts={paginatedAlerts}
               selectedId={selectedId}
               onSelect={setSelectedId}
             />
           </div>
-          <div className="lg:col-span-5 lg:row-start-3 min-h-0 overflow-y-auto scroll-panel">
-            <AlertDetail
-              alert={selectedAlert}
-              onReviewComplete={silentRefresh}
-              onToast={(message, type) => setToast({ message, type })}
-            />
-          </div>
 
-          <div className="lg:col-span-7 lg:row-start-4">
+          <div className="shrink-0">
             <Pagination
               page={page}
               pageSize={PAGE_SIZE}
@@ -115,17 +118,18 @@ export function AlertsPage() {
               onPageChange={setPage}
             />
           </div>
-          <div className="hidden lg:flex lg:col-span-5 lg:row-start-4 items-center justify-end">
-            <Link
-              href="/trigger"
-              className="flex items-center gap-1.5 text-xs text-cyan-400/80 hover:text-cyan-300 transition-colors"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Trigger more events
-            </Link>
-          </div>
         </div>
       </div>
+
+      {selectedAlert && (
+        <AlertDetailFullscreenModal
+          alert={selectedAlert}
+          open={Boolean(selectedId)}
+          onClose={() => setSelectedId(null)}
+          onReviewComplete={silentRefresh}
+          onToast={(message, type) => setToast({ message, type })}
+        />
+      )}
 
       {toast && (
         <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />

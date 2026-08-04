@@ -112,6 +112,11 @@ class AlertIngestResponse(BaseModel):
     duplicate_of: UUID | None = None
 
 
+class RawAlertStreamResponse(BaseModel):
+    normalized: AlertIngest
+    ingest: AlertIngestResponse
+
+
 class AlertListResponse(BaseModel):
     total: int
     items: list[AlertRecord]

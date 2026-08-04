@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-from app.config import LLMProvider, Settings
+from app.config import DEFAULT_OPENROUTER_MODEL, LLMProvider, Settings
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +71,41 @@ class LLMClient:
         if self.provider == "offline" or not self.is_configured:
             raise LLMError(f"LLM not configured. {self._key_hint()}")
 
+        try:
+            return await self._request(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                json_mode=json_mode,
+            )
+        except LLMError as exc:
+            if (
+                self.provider == "openrouter"
+                and "404" in str(exc)
+                and self.model != DEFAULT_OPENROUTER_MODEL
+            ):
+                logger.warning(
+                    "Model %s unavailable — falling back to %s",
+                    self.model,
+                    DEFAULT_OPENROUTER_MODEL,
+                )
+                self._model_override = DEFAULT_OPENROUTER_MODEL
+                return await self._request(
+                    messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    json_mode=json_mode,
+                )
+            raise
+
+    async def _request(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float | None,
+        max_tokens: int | None,
+        json_mode: bool,
+    ) -> str:
         headers: dict[str, str] = {
             "Authorization": f"Bearer {self._settings.api_key_for(self.provider)}",
             "Content-Type": "application/json",
@@ -94,7 +129,7 @@ class LLMClient:
             body["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=90.0) as client:
                 response = await client.post(
                     f"{self._settings.base_url_for(self.provider)}/chat/completions",
                     headers=headers,

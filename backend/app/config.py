@@ -64,7 +64,7 @@ LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
         "signup_url": "https://aistudio.google.com/apikey",
     },
     "openrouter": {
-        "label": "OpenRouter · Nemotron",
+        "label": "OpenRouter",
         "free": True,
         "key_hint": "LLM_API_KEY from openrouter.ai/keys",
         "signup_url": "https://openrouter.ai/keys",

@@ -10,7 +10,9 @@ from app.models.schemas import (
     AlertRecord,
     AlertStatus,
     PipelineStats,
+    RawAlertStreamResponse,
 )
+from app.services.llm_client import LLMError
 from app.services.alert_pipeline import AlertPipeline
 from app.services.alert_store import AlertStore
 from app.services.stream_hub import stream_hub
@@ -37,13 +39,37 @@ async def ingest_alert(
     pipeline: AlertPipeline = Depends(get_pipeline),
     store: AlertStore = Depends(get_store),
 ) -> AlertIngestResponse:
-    """Receive alert and run the agent pipeline: validate → deduplicate → prioritize."""
+    """Receive standardized alert and run validate → deduplicate → prioritize."""
     response, record = await pipeline.process(payload, store=store)
     if not response.accepted or record is None:
         return response
 
     await store.save(record)
     return response
+
+
+@router.post("/stream", response_model=RawAlertStreamResponse, status_code=status.HTTP_202_ACCEPTED)
+async def ingest_raw_alert(
+    payload: dict,
+    _: str = Depends(verify_api_key),
+    pipeline: AlertPipeline = Depends(get_pipeline),
+    store: AlertStore = Depends(get_store),
+) -> RawAlertStreamResponse:
+    """Ingest agent normalizes raw monitoring payload, then runs the pipeline."""
+    try:
+        response, record, normalized = await pipeline.process_raw(payload, store=store)
+        if normalized is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Ingest agent could not normalize alert",
+            )
+        if response.accepted and record is not None:
+            await store.save(record)
+        return RawAlertStreamResponse(normalized=normalized, ingest=response)
+    except LLMError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
 @router.get("", response_model=AlertListResponse)

@@ -73,6 +73,11 @@ export interface AlertIngestResponse {
   duplicate_of: string | null;
 }
 
+export interface RawAlertStreamResponse {
+  normalized: AlertIngest;
+  ingest: AlertIngestResponse;
+}
+
 export interface AlertListResponse {
   total: number;
   items: AlertRecord[];
@@ -121,7 +126,7 @@ export interface PipelineStage {
 }
 
 export const PIPELINE_STAGES: PipelineStage[] = [
-  { id: "ingest", label: "Ingest", description: "Agent receives alert payload" },
+  { id: "ingest", label: "Ingest", description: "Agent normalizes raw monitoring payload" },
   { id: "validate", label: "Validate", description: "AI validation agent checks quality" },
   { id: "dedup", label: "Deduplicate", description: "AI dedup agent vs open alerts" },
   { id: "prioritize", label: "Prioritize", description: "AI assigns P1–P5 priority" },

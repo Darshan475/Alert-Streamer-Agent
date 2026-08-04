@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_BASE, apiBaseToWs } from "@/lib/api";
+import { API_BASE, apiBaseToWs, getAlerts, getStats } from "@/lib/api";
 import type { AlertRecord, PipelineStats } from "@/lib/types";
 
 const WS_PATH = "/api/v1/alerts/ws";
-const RECONNECT_MS = 3000;
+const RECONNECT_MS = 5000;
 
 interface StreamSnapshot {
   type: "snapshot";
@@ -22,6 +22,27 @@ export function useAlertStream() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const bootstrappedRef = useRef(false);
+
+  const applySnapshot = useCallback((items: AlertRecord[], nextStats: PipelineStats) => {
+    setAlerts(items);
+    setStats(nextStats);
+    setHasSnapshot(true);
+    setError(null);
+  }, []);
+
+  useEffect(() => {
+    if (bootstrappedRef.current) return;
+    bootstrappedRef.current = true;
+    Promise.all([getAlerts({ limit: 100 }), getStats()])
+      .then(([list, nextStats]) => {
+        if (!mountedRef.current) return;
+        applySnapshot(list.items, nextStats);
+      })
+      .catch(() => {
+        /* WebSocket will retry */
+      });
+  }, [applySnapshot]);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -41,10 +62,7 @@ export function useAlertStream() {
       try {
         const msg = JSON.parse(event.data as string) as StreamSnapshot;
         if (msg.type === "snapshot") {
-          setAlerts(msg.alerts.items);
-          setStats(msg.stats);
-          setHasSnapshot(true);
-          setError(null);
+          applySnapshot(msg.alerts.items, msg.stats);
         }
       } catch {
         /* ignore malformed frames */
@@ -53,7 +71,7 @@ export function useAlertStream() {
 
     ws.onerror = () => {
       if (!mountedRef.current) return;
-      setError(new Error("WebSocket connection failed"));
+      if (!hasSnapshot) setError(new Error("WebSocket connection failed"));
     };
 
     ws.onclose = () => {
@@ -62,7 +80,7 @@ export function useAlertStream() {
       wsRef.current = null;
       reconnectRef.current = setTimeout(connect, RECONNECT_MS);
     };
-  }, []);
+  }, [applySnapshot, hasSnapshot]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -72,7 +90,7 @@ export function useAlertStream() {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send("ping");
       }
-    }, 25000);
+    }, 30000);
 
     return () => {
       mountedRef.current = false;
@@ -94,7 +112,7 @@ export function useAlertStream() {
     connected,
     error,
     hasSnapshot,
-    isLoading: !hasSnapshot && !error,
+    isLoading: !hasSnapshot,
     reconnect,
   };
 }

@@ -11,10 +11,11 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.api import agents, alerts, llm
-from app.config import DEFAULT_LLM_PROVIDER, get_settings
+from app.config import DEFAULT_LLM_PROVIDER, DEFAULT_OPENROUTER_MODEL, get_settings
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
+from app.services.ingest_agent import IngestAgent
 from app.services.llm_client import LLMClient
 from app.services.pipeline_agent import PipelineAgent
 
@@ -26,12 +27,15 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 settings = get_settings()
 llm_client = LLMClient(settings)
 llm_client.set_provider(settings.llm_provider or DEFAULT_LLM_PROVIDER)
-if settings.llm_model:
-    llm_client.set_model(settings.llm_model)
+_startup_model = settings.llm_model or DEFAULT_OPENROUTER_MODEL
+if "nemotron" in _startup_model.lower() and (settings.llm_provider or DEFAULT_LLM_PROVIDER) == "openrouter":
+    _startup_model = DEFAULT_OPENROUTER_MODEL
+llm_client.set_model(_startup_model)
 alert_store = AlertStore()
 dedup_store = DedupStore(ttl_seconds=settings.dedup_ttl_seconds)
 pipeline_agent = PipelineAgent(llm_client)
-alert_pipeline = AlertPipeline(dedup_store, pipeline_agent=pipeline_agent)
+ingest_agent = IngestAgent(llm_client)
+alert_pipeline = AlertPipeline(dedup_store, pipeline_agent=pipeline_agent, ingest_agent=ingest_agent)
 alert_generator = AlertGeneratorAgent(llm_client)
 
 limiter = Limiter(key_func=get_remote_address)
@@ -56,7 +60,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.5.1",
+    version="2.6.1",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -84,7 +88,7 @@ async def health():
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
         "pipeline": "ingest → validate → deduplicate → prioritize",
-        "agents": ["pipeline", "generator", "websocket"],
+        "agents": ["ingest", "pipeline", "generator", "websocket"],
     }
 
 

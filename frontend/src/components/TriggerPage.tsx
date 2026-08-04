@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { generateAgentAlert, getHealth, getStats, API_BASE } from "@/lib/api";
+import { generateAgentAlert, getHealth, getStats, ingestRawAlert, API_BASE } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
@@ -18,7 +18,18 @@ import {
   XCircle,
   ArrowRight,
   Radio,
+  Zap,
 } from "lucide-react";
+
+const DEMO_RAW_ALERT = {
+  "alert-id": "ALT-001",
+  service: "payment-api",
+  metric: "error-rate",
+  value: 22,
+  threshold: 5,
+  message: "High error-rate",
+  source: "CloudWatch",
+};
 
 interface StreamEvent {
   id: string;
@@ -43,6 +54,7 @@ export function TriggerPage() {
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [normalizing, setNormalizing] = useState(false);
   const [delayMs, setDelayMs] = useState(800);
   const [streamCount, setStreamCount] = useState(5);
   const [hint, setHint] = useState("");
@@ -128,6 +140,33 @@ export function TriggerPage() {
     [hint, pushEvent]
   );
 
+  const sendRawDemoAlert = useCallback(async () => {
+    setNormalizing(true);
+    try {
+      const res = await ingestRawAlert(DEMO_RAW_ALERT);
+      setGenerated((prev) => [res.normalized, ...prev].slice(0, 12));
+      pushEvent(res.normalized, res.ingest);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Raw ingest failed";
+      setToast({ message, type: "error" });
+      pushEvent(
+        {
+          source: "cloudwatch",
+          alert_type: "raw_ingest_error",
+          title: DEMO_RAW_ALERT.message,
+          description: message,
+          severity: "high",
+          service: DEMO_RAW_ALERT.service,
+          environment: "production",
+        },
+        null,
+        message
+      );
+    } finally {
+      setNormalizing(false);
+    }
+  }, [pushEvent]);
+
   const autoStream = useCallback(async () => {
     if (streaming || backendOk === false) return;
     stopRef.current = false;
@@ -162,7 +201,7 @@ export function TriggerPage() {
   return (
     <AppShell subtitle="Agent-driven event generation" showControls>
       <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-        <LoadingOverlay show={generating && !streaming} label="Agent generating alert…" />
+        <LoadingOverlay show={generating && !streaming && !normalizing} label="Agent working…" />
 
         <div className="shrink-0 grid grid-cols-2 lg:grid-cols-6 gap-3">
           <MetricCard
@@ -180,6 +219,28 @@ export function TriggerPage() {
 
         <div className="flex-1 min-h-0 grid lg:grid-cols-12 gap-4">
           <div className="lg:col-span-5 flex flex-col min-h-0 gap-3">
+            <div className="shrink-0 rounded-xl border border-cyan-500/25 bg-gradient-to-br from-cyan-500/5 to-emerald-500/5 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-cyan-300">
+                <Zap className="h-4 w-4" />
+                <span className="text-sm font-medium">Ingest Agent (Step 1)</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Send a raw CloudWatch-style payload — the ingest agent normalizes it before validate → dedup → prioritize.
+              </p>
+              <pre className="rounded-lg border border-slate-800 bg-[#070a12] p-2 text-[10px] text-slate-500 overflow-x-auto">
+                {JSON.stringify(DEMO_RAW_ALERT, null, 2)}
+              </pre>
+              <button
+                type="button"
+                onClick={() => void sendRawDemoAlert()}
+                disabled={normalizing || streaming || backendOk === false}
+                className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
+              >
+                <Zap className="h-3 w-3" />
+                Send Raw Alert
+              </button>
+            </div>
+
             <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-4 space-y-3">
               <div className="flex items-center gap-2 text-violet-300">
                 <Sparkles className="h-4 w-4" />
@@ -337,7 +398,7 @@ export function TriggerPage() {
             </div>
 
             <p className="shrink-0 text-[10px] text-slate-600 truncate">
-              Agent pipeline: ingest → validate → deduplicate → prioritize · {API_BASE}/api/v1/agents
+              Agent pipeline: ingest → validate → deduplicate → prioritize · {API_BASE}/api/v1/alerts/stream
             </p>
           </div>
         </div>

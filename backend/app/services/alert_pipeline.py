@@ -21,6 +21,7 @@ CLOSED_STATUSES = frozenset(
 
 if TYPE_CHECKING:
     from app.services.alert_store import AlertStore
+    from app.services.ingest_agent import IngestAgent
     from app.services.pipeline_agent import PipelineAgent
 
 
@@ -82,15 +83,43 @@ def build_alert_record(
 class AlertPipeline:
     """AI pipeline agent orchestrates validate → dedup → prioritize."""
 
-    def __init__(self, dedup_store: "DedupStore", pipeline_agent: "PipelineAgent | None" = None) -> None:
+    def __init__(
+        self,
+        dedup_store: "DedupStore",
+        pipeline_agent: "PipelineAgent | None" = None,
+        ingest_agent: "IngestAgent | None" = None,
+    ) -> None:
         self._dedup = dedup_store
         self._agent = pipeline_agent
+        self._ingest = ingest_agent
+
+    async def process_raw(
+        self,
+        raw: dict,
+        *,
+        store: "AlertStore | None" = None,
+    ) -> tuple[AlertIngestResponse, AlertRecord | None, AlertIngest | None]:
+        """Normalize raw monitoring payload, then run validate → dedup → prioritize."""
+        if self._ingest is None:
+            return (
+                AlertIngestResponse(
+                    accepted=False,
+                    status=AlertStatus.REJECTED,
+                    message="Ingest agent not configured",
+                ),
+                None,
+                None,
+            )
+        alert, ingest_stage = await self._ingest.normalize(raw)
+        response, record = await self.process(alert, store=store, ingest_stage=ingest_stage)
+        return response, record, alert
 
     async def process(
         self,
         alert: AlertIngest,
         *,
         store: "AlertStore | None" = None,
+        ingest_stage: dict | None = None,
     ) -> tuple[AlertIngestResponse, AlertRecord | None]:
         try:
             alert = AlertIngest.model_validate(alert.model_dump())
@@ -166,18 +195,19 @@ class AlertPipeline:
                 None,
             )
 
+        stage_log = ([ingest_stage] if ingest_stage else []) + result.stage_log
         record = build_alert_record(
             alert,
             fingerprint,
             result.category,
             result.team,
             result.priority,
-            stage_log=result.stage_log,
+            stage_log=stage_log,
             extra_metadata=result.enriched_metadata,
         )
         await self._dedup.set(fingerprint, str(record.id))
 
-        stages = " → ".join(s["stage"] for s in result.stage_log if "stage" in s)
+        stages = " → ".join(s["stage"] for s in stage_log if "stage" in s)
         return (
             AlertIngestResponse(
                 accepted=True,

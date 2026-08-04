@@ -36,6 +36,16 @@ export async function ingestAlert(
   });
 }
 
+export async function ingestRawAlert(
+  payload: Record<string, unknown>
+): Promise<import("./types").RawAlertStreamResponse> {
+  return fetchJson("/api/v1/alerts/stream", {
+    method: "POST",
+    headers: { "X-API-Key": API_KEY },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getAlerts(params?: {
   status?: string;
   team?: string;

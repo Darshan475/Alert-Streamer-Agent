@@ -104,9 +104,11 @@ class AlertGeneratorAgent:
                 final = await self._graph.ainvoke(initial)
                 data = final.get("result") or {}
                 title = data.get("title")
-                if title and title not in (recent_titles or []):
-                    return self._to_ingest(data)
-                raise ValueError("Generator agent returned duplicate or empty title")
+                if not title:
+                    raise ValueError("Generator agent returned empty title")
+                if title in (recent_titles or []):
+                    data = {**data, "title": f"{title} ({datetime.now(UTC).strftime('%H:%M:%S')})"}
+                return self._to_ingest(data)
             except Exception as exc:
                 last_error = exc
                 logger.warning("Alert generator attempt %d failed: %s", attempt + 1, exc)

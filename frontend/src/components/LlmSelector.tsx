@@ -12,7 +12,10 @@ interface Props {
 }
 
 export function LlmSelector({ onChanged, compact = false }: Props) {
-  const { data, mutate, isLoading } = useSWR<LlmProvidersResponse>("llm-providers", getLlmProviders);
+  const { data, mutate, isLoading } = useSWR<LlmProvidersResponse>("llm-providers", getLlmProviders, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
   const [saving, setSaving] = useState(false);
 
   const active = data?.providers.find((p) => p.id === data.active_provider);
