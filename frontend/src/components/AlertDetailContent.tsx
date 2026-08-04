@@ -8,7 +8,6 @@ import {
   statusColor,
   teamLabel,
 } from "@/lib/utils";
-import { PipelineFlow } from "./PipelineFlow";
 import { Bot, Shield, Zap } from "lucide-react";
 
 interface Props {
@@ -44,8 +43,6 @@ export function AlertDetailContent({
           {alert.description}
         </p>
       </div>
-
-      <PipelineFlow alert={alert} />
 
       <div className={`grid grid-cols-2 ${spacious ? "sm:grid-cols-3 gap-4" : "gap-3"} text-sm`}>
         <Meta label="Service" value={alert.service} spacious={spacious} />

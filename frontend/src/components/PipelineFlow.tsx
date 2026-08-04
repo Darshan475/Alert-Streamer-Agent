@@ -6,13 +6,14 @@ import { CheckCircle2, Circle } from "lucide-react";
 
 interface Props {
   alert: AlertRecord;
+  className?: string;
 }
 
-export function PipelineFlow({ alert }: Props) {
+export function PipelineFlow({ alert, className = "" }: Props) {
   const currentStage = statusToStageIndex(alert.status);
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className={`flex flex-wrap items-center gap-1 ${className}`}>
       {PIPELINE_STAGES.map((stage, index) => {
         const done = index < currentStage;
         const active = index === currentStage;

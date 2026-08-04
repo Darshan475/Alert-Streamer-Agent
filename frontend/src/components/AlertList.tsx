@@ -41,6 +41,7 @@ export function AlertList({ alerts, selectedId, onSelect }: Props) {
               : "border-slate-700/60 bg-slate-900/40"
           }`}
         >
+          <PipelineFlow alert={alert} className="mb-3" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -59,9 +60,6 @@ export function AlertList({ alerts, selectedId, onSelect }: Props) {
               </div>
               <h3 className="font-medium text-white truncate">{alert.title}</h3>
               <p className="text-sm text-slate-400 mt-1 line-clamp-1">{alert.description}</p>
-              <div className="mt-3">
-                <PipelineFlow alert={alert} />
-              </div>
             </div>
             <ChevronRight className="h-5 w-5 text-slate-600 shrink-0 mt-1" />
           </div>
