@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AiChat } from "@/components/AiChat";
 import { LlmSelector } from "@/components/LlmSelector";
 import { Radio, RefreshCw, Zap, ShieldCheck } from "lucide-react";
 
@@ -17,6 +18,7 @@ interface AppShellProps {
   onLlmChanged?: (message: string) => void;
   showControls?: boolean;
   live?: boolean;
+  chatAlertId?: string | null;
 }
 
 export function AppShell({
@@ -26,6 +28,7 @@ export function AppShell({
   onLlmChanged,
   showControls = true,
   live = false,
+  chatAlertId = null,
 }: AppShellProps) {
   const pathname = usePathname();
 
@@ -92,6 +95,7 @@ export function AppShell({
       </header>
 
       <main className="flex-1 min-h-0 overflow-hidden">{children}</main>
+      <AiChat selectedAlertId={chatAlertId} />
     </div>
   );
 }
