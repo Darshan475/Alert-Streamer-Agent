@@ -70,6 +70,49 @@ export async function setLlmProvider(
   });
 }
 
+export async function setLlmModel(
+  model: string
+): Promise<import("./types").SetLlmProviderResponse> {
+  return fetchJson("/api/v1/llm/model", {
+    method: "PUT",
+    body: JSON.stringify({ model }),
+  });
+}
+
+export async function generateAgentAlert(
+  hint?: string
+): Promise<{ alert: import("./types").AlertIngest; ingest: import("./types").AlertIngestResponse }> {
+  return fetchJson("/api/v1/agents/generate-alert", {
+    method: "POST",
+    headers: { "X-API-Key": API_KEY },
+    body: JSON.stringify({ hint: hint ?? null }),
+  });
+}
+
+export async function agentAutoStream(
+  count: number,
+  hint?: string
+): Promise<{ generated: number; results: import("./types").AlertIngestResponse[] }> {
+  return fetchJson("/api/v1/agents/auto-stream", {
+    method: "POST",
+    headers: { "X-API-Key": API_KEY },
+    body: JSON.stringify({ count, hint: hint ?? null }),
+  });
+}
+
+export async function batchReviewAlerts(payload: {
+  alert_ids: string[];
+  decision?: import("./types").HumanReviewDecision;
+  reviewer?: string;
+  assigned_to?: string;
+  feedback?: string;
+}): Promise<{ approved: string[]; failed: { id: string; error: string }[]; count: number }> {
+  return fetchJson("/api/v1/agents/batch-review", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function sendChat(
   message: string,
   alertId?: string

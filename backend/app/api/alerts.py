@@ -10,14 +10,14 @@ from app.models.schemas import (
     AlertListResponse,
     AlertRecord,
     AlertStatus,
-    HumanReview,
-    HumanReviewDecision,
     HumanReviewRequest,
     PipelineStats,
 )
-from app.services.alert_pipeline import HUMAN_REVIEW_MAX_PRIORITY, AlertPipeline
+from app.services.alert_pipeline import AlertPipeline
 from app.services.alert_store import AlertStore
 from app.services.investigation_agent import InvestigationAgent
+from app.services.review_actions import apply_human_review
+from app.services.routing_agent import RoutingAgent
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -40,9 +40,16 @@ def get_agent() -> InvestigationAgent:
     return investigation_agent
 
 
+def get_routing_agent() -> RoutingAgent:
+    from app.main import routing_agent
+
+    return routing_agent
+
+
 async def _run_investigation(alert_id: UUID) -> None:
     store = get_store()
     agent = get_agent()
+    router = get_routing_agent()
     alert = await store.get(alert_id)
     if not alert:
         return
@@ -55,20 +62,12 @@ async def _run_investigation(alert_id: UUID) -> None:
     alert.investigation = investigation
     now = datetime.now(UTC)
 
-    if alert.priority <= HUMAN_REVIEW_MAX_PRIORITY:
-        alert.status = AlertStatus.PENDING_REVIEW
-    else:
-        alert.status = AlertStatus.RESOLVED
-        alert.human_review = HumanReview(
-            decision=HumanReviewDecision.APPROVE,
-            reviewer="system-auto-resolve",
-            feedback=(
-                f"Auto-resolved: P{alert.priority} alerts skip human review "
-                f"(only P1–P{HUMAN_REVIEW_MAX_PRIORITY} require approval)."
-            ),
-            reviewed_at=now,
-        )
+    status, auto_review, reason = await router.route(alert, investigation)
+    alert.status = status
+    if auto_review:
+        alert.human_review = auto_review
 
+    alert.metadata = {**alert.metadata, "routing_reason": reason}
     alert.updated_at = now
     await store.update(alert)
 
@@ -136,57 +135,12 @@ async def submit_human_review(
     store: AlertStore = Depends(get_store),
 ) -> AlertRecord:
     """Human-in-the-loop: approve, reject, or escalate after LLM investigation."""
-    alert = await store.get(alert_id)
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-
-    if alert.status in (AlertStatus.RESOLVED, AlertStatus.REJECTED):
-        raise HTTPException(status_code=409, detail="Alert already closed")
-
-    if alert.status not in (
-        AlertStatus.PENDING_REVIEW,
-        AlertStatus.INVESTIGATING,
-        AlertStatus.ESCALATED,
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot review alert in status '{alert.status.value}'",
-        )
-
-    if payload.decision in (HumanReviewDecision.APPROVE, HumanReviewDecision.ESCALATE):
-        if not payload.assigned_to.strip():
-            raise HTTPException(
-                status_code=422,
-                detail="assigned_to is required — assign the ticket to a team member before approving or escalating.",
-            )
-
-    assign_team = payload.assigned_team or alert.team
-    now = datetime.now(UTC)
-    review = HumanReview(
-        decision=payload.decision,
-        reviewer=payload.reviewer,
-        feedback=payload.feedback,
-        reviewed_at=now,
-        override_recommendations=payload.override_recommendations,
-        assigned_team=assign_team,
-        assigned_to=payload.assigned_to.strip(),
-    )
-    alert.human_review = review
-    alert.team = assign_team
-    alert.updated_at = now
-
-    if payload.decision == HumanReviewDecision.APPROVE:
-        alert.status = AlertStatus.RESOLVED
-        if payload.override_recommendations and alert.investigation:
-            alert.investigation.recommendations = payload.override_recommendations
-    elif payload.decision == HumanReviewDecision.REJECT:
-        alert.status = AlertStatus.REJECTED
-    elif payload.decision == HumanReviewDecision.ESCALATE:
-        alert.status = AlertStatus.ESCALATED
-        alert.priority = max(1, alert.priority - 1)
-
-    await store.update(alert)
-    return alert
+    record, err = await apply_human_review(store, alert_id, payload)
+    if record is None:
+        if err and "not found" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        raise HTTPException(status_code=409 if err and "closed" in err.lower() else 422, detail=err)
+    return record
 
 
 @router.post("/{alert_id}/investigate", response_model=AlertRecord)

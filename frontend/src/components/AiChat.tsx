@@ -4,12 +4,14 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { usePathname } from "next/navigation";
-import { sendChat } from "@/lib/api";
+import { batchReviewAlerts, sendChat } from "@/lib/api";
+import type { ChatAction } from "@/lib/types";
 import { Bot, MessageCircle, Send, Sparkles, X, Loader2 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  actions?: ChatAction[];
 }
 
 interface Props {
@@ -18,14 +20,14 @@ interface Props {
 
 const PAGE_PROMPTS: Record<string, { label: string; prompt: string }[]> = {
   "/trigger": [
-    { label: "How to stream?", prompt: "How do I trigger and stream test monitoring events?" },
-    { label: "After ingest?", prompt: "What pipeline steps run after an alert is ingested?" },
-    { label: "Duplicates?", prompt: "When are duplicate alerts suppressed vs re-opened?" },
+    { label: "Generate alert", prompt: "Generate a new critical production alert and ingest it." },
+    { label: "Auto stream", prompt: "Explain how the agent auto-stream works on this page." },
+    { label: "Pipeline", prompt: "What agent steps run after an alert is ingested?" },
   ],
   "/alerts": [
+    { label: "Group pending", prompt: "Group all pending_review alerts by service and show combined groups." },
+    { label: "Approve group", prompt: "Find grouped pending alerts and prepare batch approve actions for me." },
     { label: "P1 review list", prompt: "List all P1/P2 alerts that need human review right now." },
-    { label: "Investigate", prompt: "Explain what LLM investigation does for a selected alert and what I should validate." },
-    { label: "Escalate vs Approve", prompt: "When should I escalate vs approve vs reject an alert in human review?" },
     { label: "Summarize stream", prompt: "Summarize the current alert stream by severity and status." },
   ],
 };
@@ -43,8 +45,8 @@ export function AiChat({ selectedAlertId = null }: Props) {
 
   const welcome =
     pageKey === "/trigger"
-      ? "Hi! I'm your **Alert Streamer copilot**. Ask about triggering events, ingest pipeline, or duplicates. I use live backend data when available."
-      : "Hi! I'm your **Alert Streamer copilot**. Ask about investigations, **escalation**, or **human review**. Select an alert for context — or use quick actions below.";
+      ? "Hi! I'm your **agent copilot**. I generate alerts, run the triage/investigation pipeline, and can trigger events — no JSON files."
+      : "Hi! I'm your **agent copilot**. Ask me to **group pending alerts** or **approve combined batches**. Select an alert for context.";
 
   useEffect(() => {
     if (open && messages.length === 0) {
@@ -63,7 +65,14 @@ export function AiChat({ selectedAlertId = null }: Props) {
       setLoading(true);
       try {
         const res = await sendChat(text.trim(), selectedAlertId ?? undefined);
-        setMessages((prev) => [...prev, { role: "assistant", content: res.reply }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: res.reply,
+            actions: res.actions?.length ? res.actions : undefined,
+          },
+        ]);
       } catch (err) {
         setMessages((prev) => [
           ...prev,
@@ -78,6 +87,35 @@ export function AiChat({ selectedAlertId = null }: Props) {
     },
     [loading, selectedAlertId]
   );
+
+  async function handleBatchApprove(action: ChatAction) {
+    if (!action.alert_ids.length || loading) return;
+    setLoading(true);
+    try {
+      const result = await batchReviewAlerts({
+        alert_ids: action.alert_ids,
+        decision: "approve",
+        feedback: `Batch approved: ${action.label}`,
+      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `**Approved ${result.count} alert(s)** in group "${action.label}".${result.failed.length ? ` Failed: ${result.failed.length}` : ""}`,
+        },
+      ]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `**Batch approve failed:** ${err instanceof Error ? err.message : "Unknown error"}`,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -153,6 +191,21 @@ export function AiChat({ selectedAlertId = null }: Props) {
                     </ReactMarkdown>
                   ) : (
                     msg.content
+                  )}
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {msg.actions.map((act) => (
+                        <button
+                          key={`${act.label}-${act.alert_ids.join(",")}`}
+                          type="button"
+                          disabled={loading}
+                          onClick={() => void handleBatchApprove(act)}
+                          className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40"
+                        >
+                          {act.label || `Approve ${act.alert_ids.length}`}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

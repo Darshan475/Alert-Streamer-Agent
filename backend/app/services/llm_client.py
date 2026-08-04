@@ -18,6 +18,7 @@ class LLMClient:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
         self._provider_override: LLMProvider | None = None
+        self._model_override: str | None = None
 
     @property
     def provider(self) -> LLMProvider:
@@ -32,6 +33,10 @@ class LLMClient:
             self.model,
         )
 
+    def set_model(self, model: str) -> None:
+        self._model_override = model
+        logger.info("LLM model switched to %s", model)
+
     def model_for(self, provider: LLMProvider | None = None) -> str:
         return self._settings.model_for(provider or self.provider)
 
@@ -42,6 +47,8 @@ class LLMClient:
 
     @property
     def model(self) -> str:
+        if self._model_override:
+            return self._model_override
         return self.model_for()
 
     @property

@@ -81,16 +81,14 @@ Investigation:
 - Urgency: {inv.urgency_score}/10
 - Recommendations: {'; '.join(inv.recommendations)}
 """
-        hr = alert.human_review
-        hr_text = ""
         if hr:
             hr_text = f"""
 Human review: {hr.decision.value} by {hr.reviewer}
 Feedback: {hr.feedback or 'none'}
 """
-        if hr.assigned_to:
-            team_name = hr.assigned_team.value if hr.assigned_team else alert.team.value
-            hr_text += f"Assigned to: {hr.assigned_to} ({team_name} team)\n"
+            if hr.assigned_to:
+                team_name = hr.assigned_team.value if hr.assigned_team else alert.team.value
+                hr_text += f"Assigned to: {hr.assigned_to} ({team_name} team)\n"
         return f"""Alert context:
 - ID: {alert.id}
 - Title: {alert.title}

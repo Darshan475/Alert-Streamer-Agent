@@ -13,7 +13,7 @@ PROVIDER_DEFAULTS: dict[LLMProvider, dict[str, str]] = {
     },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
-        "model": "openai/gpt-4o-mini",
+        "model": "nvidia/llama-3.1-nemotron-70b-instruct",
     },
     "groq": {
         "base_url": "https://api.groq.com/openai/v1",
@@ -44,7 +44,14 @@ PLACEHOLDER_KEYS = frozenset(
     }
 )
 
-DEFAULT_LLM_PROVIDER: LLMProvider = "gemini"
+DEFAULT_LLM_PROVIDER: LLMProvider = "openrouter"
+
+OPENROUTER_MODELS: list[str] = [
+    "nvidia/llama-3.1-nemotron-70b-instruct",
+    "nvidia/nemotron-4-340b-instruct",
+    "openai/gpt-4o-mini",
+    "openai/gpt-4o",
+]
 
 LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
     "gemini": {

@@ -24,9 +24,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
-      - run: python -c "from app.main import app; print('API OK')"
+      - run: python -c "from app.main import app; print('API OK', app.version)"
       - run: test -f app/static/index.html
-      - run: test -f data/dummy_alerts.json
 
   build-frontend:
     runs-on: ubuntu-latest

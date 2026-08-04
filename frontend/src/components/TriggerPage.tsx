@@ -5,13 +5,15 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { ingestAlert, getHealth, getStats, API_BASE } from "@/lib/api";
+import { generateAgentAlert, getHealth, getStats, API_BASE } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
+  Bot,
   CheckCircle2,
   Loader2,
   Play,
+  Sparkles,
   Square,
   XCircle,
   ArrowRight,
@@ -28,10 +30,6 @@ interface StreamEvent {
   severity: string;
 }
 
-interface SampleAlertsFile {
-  alerts: AlertIngest[];
-}
-
 const severityColors: Record<string, string> = {
   critical: "text-red-400 bg-red-500/15 border-red-500/30",
   high: "text-orange-400 bg-orange-500/15 border-orange-500/30",
@@ -41,27 +39,21 @@ const severityColors: Record<string, string> = {
 };
 
 export function TriggerPage() {
-  const [samples, setSamples] = useState<AlertIngest[]>([]);
+  const [generated, setGenerated] = useState<AlertIngest[]>([]);
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [streaming, setStreaming] = useState(false);
-  const [delayMs, setDelayMs] = useState(600);
+  const [generating, setGenerating] = useState(false);
+  const [delayMs, setDelayMs] = useState(800);
+  const [streamCount, setStreamCount] = useState(5);
+  const [hint, setHint] = useState("");
   const [sent, setSent] = useState(0);
   const [accepted, setAccepted] = useState(0);
   const [rejected, setRejected] = useState(0);
   const [duplicates, setDuplicates] = useState(0);
-  const [samplesLoading, setSamplesLoading] = useState(true);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const stopRef = useRef(false);
   const logRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    fetch("/sample-alerts.json")
-      .then((r) => r.json())
-      .then((data: SampleAlertsFile) => setSamples(data.alerts ?? []))
-      .catch(() => setToast({ message: "Failed to load sample alerts", type: "error" }))
-      .finally(() => setSamplesLoading(false));
-  }, []);
 
   useEffect(() => {
     getHealth()
@@ -70,9 +62,7 @@ export function TriggerPage() {
   }, []);
 
   useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [events]);
 
   const pushEvent = useCallback(
@@ -106,22 +96,29 @@ export function TriggerPage() {
     []
   );
 
-  const sendOne = useCallback(
-    async (alert: AlertIngest) => {
+  const generateAndIngest = useCallback(
+    async (scenarioHint?: string) => {
+      setGenerating(true);
       try {
-        const result = await ingestAlert(alert);
-        pushEvent(alert, result);
-        return result;
+        const res = await generateAgentAlert(scenarioHint || hint || undefined);
+        setGenerated((prev) => [res.alert, ...prev].slice(0, 12));
+        pushEvent(res.alert, res.ingest);
+        return res;
       } catch (err) {
-        pushEvent(alert, null, err instanceof Error ? err.message : "Ingest failed");
+        setToast({
+          message: err instanceof Error ? err.message : "Agent generation failed",
+          type: "error",
+        });
         return null;
+      } finally {
+        setGenerating(false);
       }
     },
-    [pushEvent]
+    [hint, pushEvent]
   );
 
-  const streamAll = useCallback(async () => {
-    if (streaming || samples.length === 0) return;
+  const autoStream = useCallback(async () => {
+    if (streaming || backendOk === false) return;
     stopRef.current = false;
     setStreaming(true);
     setEvents([]);
@@ -130,10 +127,10 @@ export function TriggerPage() {
     setRejected(0);
     setDuplicates(0);
 
-    for (const alert of samples) {
+    for (let i = 0; i < streamCount; i++) {
       if (stopRef.current) break;
-      await sendOne(alert);
-      if (delayMs > 0 && !stopRef.current) {
+      await generateAndIngest(hint || undefined);
+      if (delayMs > 0 && !stopRef.current && i < streamCount - 1) {
         await new Promise((r) => setTimeout(r, delayMs));
       }
     }
@@ -144,7 +141,7 @@ export function TriggerPage() {
     } catch {
       /* ignore */
     }
-  }, [streaming, samples, delayMs, sendOne]);
+  }, [streaming, backendOk, streamCount, delayMs, hint, generateAndIngest]);
 
   const stopStream = () => {
     stopRef.current = true;
@@ -152,12 +149,10 @@ export function TriggerPage() {
   };
 
   return (
-    <AppShell
-      subtitle="Stream monitoring events into the pipeline"
-      showControls={false}
-    >
+    <AppShell subtitle="Agent-driven event generation — no JSON files" showControls>
       <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-        <LoadingOverlay show={samplesLoading} label="Loading event catalog…" />
+        <LoadingOverlay show={generating && !streaming} label="Agent generating alert…" />
+
         <div className="shrink-0 grid grid-cols-2 lg:grid-cols-6 gap-3">
           <MetricCard
             label="Backend"
@@ -169,18 +164,40 @@ export function TriggerPage() {
           <MetricCard label="Accepted" value={String(accepted)} icon={CheckCircle2} color="text-emerald-400" />
           <MetricCard label="Rejected" value={String(rejected)} icon={XCircle} color="text-red-400" />
           <MetricCard label="Duplicates" value={String(duplicates)} icon={Loader2} color="text-amber-400" />
-          <MetricCard label="Sample Set" value={String(samples.length)} icon={Play} color="text-purple-400" />
+          <MetricCard label="Agent Gen" value={String(generated.length)} icon={Bot} color="text-purple-400" />
         </div>
 
         <div className="flex-1 min-h-0 grid lg:grid-cols-12 gap-4">
-          {/* Left: alert catalog */}
           <div className="lg:col-span-5 flex flex-col min-h-0 gap-3">
-            <div className="shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-                Event Catalog
-              </h2>
-              <div className="flex items-center gap-2 flex-wrap">
-                <label className="flex items-center gap-2 text-xs text-slate-500">
+            <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-violet-300">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-sm font-medium">Alert Generator Agent</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                LLM agent creates realistic monitoring events and ingests them — no static JSON catalog.
+              </p>
+              <input
+                value={hint}
+                onChange={(e) => setHint(e.target.value)}
+                placeholder="Optional scenario hint (e.g. payment outage, k8s node down…)"
+                className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/40"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                  Count
+                  <select
+                    value={streamCount}
+                    onChange={(e) => setStreamCount(Number(e.target.value))}
+                    disabled={streaming}
+                    className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+                  >
+                    {[3, 5, 8, 10].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-slate-500">
                   Delay
                   <select
                     value={delayMs}
@@ -189,17 +206,25 @@ export function TriggerPage() {
                     className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
                   >
                     <option value={0}>Instant</option>
-                    <option value={300}>300ms</option>
-                    <option value={600}>600ms</option>
-                    <option value={1000}>1s</option>
-                    <option value={2000}>2s</option>
+                    <option value={500}>500ms</option>
+                    <option value={800}>800ms</option>
+                    <option value={1500}>1.5s</option>
                   </select>
                 </label>
+                <button
+                  type="button"
+                  onClick={() => void generateAndIngest()}
+                  disabled={generating || streaming || backendOk === false}
+                  className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
+                >
+                  <Bot className="h-3 w-3" />
+                  Generate One
+                </button>
                 {streaming ? (
                   <button
                     type="button"
                     onClick={stopStream}
-                    className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300 hover:bg-red-500/20"
+                    className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300"
                   >
                     <Square className="h-3 w-3" />
                     Stop
@@ -207,51 +232,48 @@ export function TriggerPage() {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => void streamAll()}
-                    disabled={samples.length === 0 || backendOk === false}
+                    onClick={() => void autoStream()}
+                    disabled={backendOk === false}
                     className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
                   >
                     <Play className="h-3 w-3" />
-                    Stream All
+                    Auto Stream
                   </button>
                 )}
               </div>
             </div>
 
+            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+              Agent-Generated Preview
+            </h2>
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 scroll-panel">
-              {samples.map((alert, i) => (
-                <div
-                  key={`${alert.title}-${i}`}
-                  className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-3 flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0 flex-1">
+              {generated.length === 0 ? (
+                <p className="text-xs text-slate-600 text-center py-8">
+                  No alerts yet — click Generate One or Auto Stream
+                </p>
+              ) : (
+                generated.map((alert, i) => (
+                  <div
+                    key={`${alert.title}-${i}`}
+                    className="rounded-lg border border-slate-700/60 bg-slate-900/40 p-3"
+                  >
                     <div className="flex flex-wrap items-center gap-1.5 mb-1">
                       <span
                         className={`rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase ${severityColors[alert.severity] ?? severityColors.info}`}
                       >
                         {alert.severity}
                       </span>
-                      <span className="text-[10px] text-slate-500">{alert.source}</span>
-                      <span className="text-[10px] text-slate-600">·</span>
+                      <span className="text-[10px] text-violet-400">agent</span>
                       <span className="text-[10px] text-slate-500">{alert.service}</span>
                     </div>
                     <p className="text-sm font-medium text-white truncate">{alert.title}</p>
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{alert.description}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{alert.description}</p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={streaming || backendOk === false}
-                    onClick={() => void sendOne(alert)}
-                    className="shrink-0 rounded border border-slate-600 px-2 py-1 text-[10px] text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 disabled:opacity-40 transition-colors"
-                  >
-                    Send
-                  </button>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
-          {/* Right: live event stream */}
           <div className="lg:col-span-7 flex flex-col min-h-0 gap-3">
             <div className="shrink-0 flex items-center justify-between">
               <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
@@ -273,8 +295,8 @@ export function TriggerPage() {
             >
               {events.length === 0 ? (
                 <p className="text-slate-600 text-center py-12">
-                  No events yet — click <span className="text-cyan-500">Stream All</span> or send individual
-                  alerts to simulate real-time ingestion.
+                  Agent will generate and ingest alerts autonomously — click{" "}
+                  <span className="text-cyan-500">Auto Stream</span>
                 </p>
               ) : (
                 events.map((ev) => (
@@ -304,7 +326,7 @@ export function TriggerPage() {
             </div>
 
             <p className="shrink-0 text-[10px] text-slate-600 truncate">
-              Resolved tickets re-open as new alerts · open duplicates are suppressed · POST {API_BASE}/api/v1/alerts/ingest
+              Agent pipeline: generate → triage agent → investigate → route → human review · {API_BASE}/api/v1/agents
             </p>
           </div>
         </div>

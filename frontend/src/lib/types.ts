@@ -112,6 +112,23 @@ export interface PipelineStats {
 export interface ChatResponse {
   reply: string;
   alert_context_used: boolean;
+  actions?: ChatAction[];
+  groups?: AlertGroup[];
+}
+
+export interface ChatAction {
+  type: string;
+  alert_ids: string[];
+  label: string;
+}
+
+export interface AlertGroup {
+  group_key: string;
+  service: string;
+  environment: string;
+  count: number;
+  alert_ids: string[];
+  titles: string[];
 }
 
 export type LlmProviderId = "gemini" | "openrouter" | "groq" | "huggingface" | "nvidia" | "offline";
@@ -125,11 +142,13 @@ export interface LlmProviderInfo {
   configured: boolean;
   key_hint: string;
   signup_url: string;
+  models?: string[];
 }
 
 export interface LlmProvidersResponse {
   active_provider: LlmProviderId;
   default_provider: LlmProviderId;
+  active_model: string;
   providers: LlmProviderInfo[];
 }
 
@@ -148,14 +167,14 @@ export interface PipelineStage {
 }
 
 export const PIPELINE_STAGES: PipelineStage[] = [
-  { id: "ingest", label: "Ingest", description: "Receive alert payload" },
-  { id: "validate", label: "Validate", description: "Check required fields" },
-  { id: "dedup", label: "Deduplicate", description: "Suppress duplicates" },
-  { id: "prioritize", label: "Prioritize", description: "Assign P1–P5 priority" },
-  { id: "assign", label: "Assign Team", description: "Route to owning team" },
-  { id: "investigate", label: "Investigate", description: "LLM root cause analysis" },
-  { id: "human_review", label: "Human Review", description: "Engineer review for P1/P2 only" },
-  { id: "resolve", label: "Resolve", description: "Closed with human sign-off" },
+  { id: "ingest", label: "Ingest", description: "Agent receives alert payload" },
+  { id: "validate", label: "Validate", description: "AI validation agent checks quality" },
+  { id: "dedup", label: "Deduplicate", description: "AI dedup agent vs open alerts" },
+  { id: "prioritize", label: "Prioritize", description: "AI assigns P1–P5 priority" },
+  { id: "assign", label: "Assign Team", description: "AI routes to owning team" },
+  { id: "investigate", label: "Investigate", description: "Investigation agent root cause" },
+  { id: "human_review", label: "Human Review", description: "Engineer review for P1/P2" },
+  { id: "resolve", label: "Resolve", description: "Routing agent closes alert" },
 ];
 
 export function statusToStageIndex(status: AlertStatus): number {

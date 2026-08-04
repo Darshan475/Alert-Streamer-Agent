@@ -167,6 +167,8 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     alert_context_used: bool = False
+    actions: list[dict] = Field(default_factory=list)
+    groups: list[dict] = Field(default_factory=list)
 
 
 class PipelineStats(BaseModel):
