@@ -1,6 +1,5 @@
 """Seed demo alerts on startup using the alert generator agent."""
 
-import asyncio
 import logging
 
 from app.services.alert_generator_agent import AlertGeneratorAgent
@@ -25,14 +24,18 @@ async def seed_demo_alerts(
     seeded = 0
     recent_titles: list[str] = []
 
-    for _ in range(max_alerts):
-        alert = await generator.generate(recent_titles=recent_titles)
-        response, record = await pipeline.process(alert, store=store)
-        if not response.accepted or record is None:
-            continue
-        await store.save(record)
-        recent_titles.append(record.title)
-        seeded += 1
+    try:
+        for _ in range(max_alerts):
+            alert = await generator.generate(recent_titles=recent_titles)
+            response, record = await pipeline.process(alert, store=store)
+            if not response.accepted or record is None:
+                continue
+            await store.save(record)
+            recent_titles.append(record.title)
+            seeded += 1
+    except Exception as exc:
+        logger.warning("Demo seed skipped — agent unavailable: %s", exc)
+        return seeded
 
     if seeded:
         logger.info("Agent seeded %d demo alert(s)", seeded)
