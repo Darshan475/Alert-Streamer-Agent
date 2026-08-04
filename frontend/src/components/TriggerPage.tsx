@@ -180,13 +180,13 @@ export function TriggerPage() {
 
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           {/* Left: Generator + Preview */}
-          <div className="flex flex-col min-h-[280px] lg:min-h-0 gap-3">
+          <div className="flex flex-col min-h-[280px] lg:min-h-0 gap-2">
+            <h2 className="shrink-0 text-sm font-medium text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="h-3.5 w-3.5 text-violet-400" />
+              Alert Generator
+            </h2>
             <div className="shrink-0 w-full rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 px-3 py-2.5 sm:px-4">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <div className="flex items-center gap-2 text-violet-300 shrink-0">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-sm font-medium whitespace-nowrap">Alert Generator</span>
-                </div>
                 <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
                     Count
                     <select
