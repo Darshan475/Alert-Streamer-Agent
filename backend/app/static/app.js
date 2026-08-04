@@ -190,34 +190,46 @@ function updateLlmStatus() {
   }
 }
 
-async function refresh() {
-  const banner = document.getElementById("error-banner");
-  try {
-    const [alertsData, stats] = await Promise.all([
-      api("/api/v1/alerts?limit=100"),
-      api("/api/v1/alerts/stats"),
-    ]);
-    state.alerts = alertsData.items;
-    state.stats = stats;
-    banner.classList.add("hidden");
-    renderStats();
-    renderFilters();
-    renderAlertList();
-    renderDetail();
-  } catch (e) {
-    banner.textContent = `Cannot reach API: ${e.message}`;
-    banner.classList.remove("hidden");
-  }
-}
-
 function esc(s) {
   const d = document.createElement("div");
   d.textContent = s ?? "";
   return d.innerHTML;
 }
 
-document.getElementById("btn-refresh").onclick = refresh;
+function wsBase() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${location.host}`;
+}
+
+function applySnapshot(msg) {
+  if (msg.type !== "snapshot") return;
+  state.alerts = msg.alerts.items;
+  state.stats = msg.stats;
+  document.getElementById("error-banner").classList.add("hidden");
+  renderStats();
+  renderFilters();
+  renderAlertList();
+  renderDetail();
+}
+
+function connectStream() {
+  const ws = new WebSocket(`${wsBase()}/api/v1/alerts/ws`);
+  ws.onmessage = (ev) => {
+    try {
+      applySnapshot(JSON.parse(ev.data));
+    } catch (_) { /* ignore */ }
+  };
+  ws.onerror = () => {
+    document.getElementById("error-banner").textContent = "WebSocket connection failed — retrying…";
+    document.getElementById("error-banner").classList.remove("hidden");
+  };
+  ws.onclose = () => setTimeout(connectStream, 3000);
+  setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) ws.send("ping");
+  }, 25000);
+}
+
+document.getElementById("btn-refresh").onclick = connectStream;
 
 loadLlm();
-refresh();
-setInterval(refresh, 4000);
+connectStream();

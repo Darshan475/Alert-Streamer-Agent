@@ -56,6 +56,9 @@ class AlertStore:
             }
         )
         self._persist()
+        from app.services.stream_hub import stream_hub
+
+        await stream_hub.broadcast(self)
         return alert
 
     async def update(self, alert: AlertRecord) -> AlertRecord:
@@ -68,6 +71,9 @@ class AlertStore:
             }
         )
         self._persist()
+        from app.services.stream_hub import stream_hub
+
+        await stream_hub.broadcast(self)
         return alert
 
     async def get(self, alert_id: UUID) -> AlertRecord | None:

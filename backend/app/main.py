@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.4.0",
+    version="2.5.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -83,7 +83,7 @@ async def health():
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
         "pipeline": "ingest → validate → deduplicate → prioritize",
-        "agents": ["pipeline", "generator"],
+        "agents": ["pipeline", "generator", "websocket"],
     }
 
 

@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 
 from app.api.security import verify_api_key
 from app.models.schemas import (
@@ -13,6 +13,7 @@ from app.models.schemas import (
 )
 from app.services.alert_pipeline import AlertPipeline
 from app.services.alert_store import AlertStore
+from app.services.stream_hub import stream_hub
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -73,6 +74,18 @@ async def get_events(
 ) -> dict:
     events = await store.get_events(since_index=since)
     return {"events": events, "next_index": since + len(events)}
+
+
+@router.websocket("/ws")
+async def alert_stream(websocket: WebSocket) -> None:
+    """Real-time alert stream — pushes snapshots on connect and after each change."""
+    store = get_store()
+    await stream_hub.connect(websocket, store)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        await stream_hub.disconnect(websocket)
 
 
 @router.get("/{alert_id}", response_model=AlertRecord)

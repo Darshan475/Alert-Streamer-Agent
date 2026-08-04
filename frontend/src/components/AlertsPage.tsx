@@ -10,7 +10,8 @@ import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Pagination } from "@/components/Pagination";
 import { StatusFilterTabs } from "@/components/StatusFilterTabs";
 import { Toast } from "@/components/Toast";
-import { useAlerts, useHealth, useStats } from "@/hooks/useAlerts";
+import { useAlertStream } from "@/hooks/useAlertStream";
+import { useHealth } from "@/hooks/useAlerts";
 import { computeFilterCounts, filterAlerts, type FilterId } from "@/lib/alertFilters";
 import { ExternalLink } from "lucide-react";
 
@@ -22,16 +23,13 @@ export function AlertsPage() {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const { data: alertsData, error, mutate, isLoading, isValidating } = useAlerts();
-  const { data: stats, mutate: mutateStats, isLoading: statsLoading } = useStats();
+  const { alerts, stats, connected, error, isLoading, reconnect } = useAlertStream();
   const { mutate: mutateHealth } = useHealth();
 
   const silentRefresh = useCallback(() => {
-    void mutate();
-    void mutateStats();
-  }, [mutate, mutateStats]);
+    reconnect();
+  }, [reconnect]);
 
-  const alerts = alertsData?.items ?? [];
   const filterCounts = useMemo(() => computeFilterCounts(alerts), [alerts]);
   const filteredAlerts = useMemo(
     () => filterAlerts(alerts, statusFilter),
@@ -45,7 +43,7 @@ export function AlertsPage() {
   }, [filteredAlerts, page]);
 
   const selectedAlert = alerts.find((a) => a.id === selectedId) ?? null;
-  const showLoader = (isLoading && !alertsData) || (isValidating && !alerts.length);
+  const showLoader = isLoading;
 
   useEffect(() => {
     setPage(1);
@@ -66,12 +64,12 @@ export function AlertsPage() {
       }}
     >
       <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-4">
-        <LoadingOverlay show={showLoader || statsLoading} label="Syncing alert stream…" />
+        <LoadingOverlay show={showLoader} label={connected ? "Syncing alert stream…" : "Connecting to stream…"} />
 
         {error && (
           <div className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-300 text-sm">
-            Cannot reach backend at {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}.
-            Start the FastAPI server first.
+            Cannot connect to alert stream at {process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}.
+            {connected ? "" : " WebSocket connection failed — retrying…"}
           </div>
         )}
 

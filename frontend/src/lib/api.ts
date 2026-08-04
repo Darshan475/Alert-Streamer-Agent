@@ -100,4 +100,10 @@ export async function agentAutoStream(
   });
 }
 
+export function apiBaseToWs(base: string): string {
+  if (base.startsWith("https://")) return base.replace("https://", "wss://");
+  if (base.startsWith("http://")) return base.replace("http://", "ws://");
+  return base;
+}
+
 export { API_BASE };
