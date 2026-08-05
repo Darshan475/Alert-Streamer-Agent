@@ -126,7 +126,7 @@ class Settings(BaseSettings):
     dedup_ttl_seconds: int = 3600
     llm_max_tokens: int = 1024
     llm_temperature: float = 0.3
-    seed_demo_alerts: bool = True
+    seed_demo_alerts: bool = False
     openrouter_site_url: str = "https://alert-streamer-frontend.vercel.app"
     openrouter_app_name: str = "Alert Streamer"
 

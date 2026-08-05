@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 import type { AlertRecord } from "@/lib/types";
 import {
+  incidentIdFromMetadata,
   priorityLabel,
   severityColor,
   statusColor,
@@ -45,6 +46,7 @@ export function AlertDetailContent({
       </div>
 
       <div className={`grid grid-cols-2 ${spacious ? "sm:grid-cols-3 gap-4" : "gap-3"} text-sm`}>
+        <Meta label="Incident ID" value={incidentIdFromMetadata(alert.metadata)} spacious={spacious} />
         <Meta label="Service" value={alert.service} spacious={spacious} />
         <Meta label="Team" value={teamLabel(alert.team)} icon={Shield} spacious={spacious} />
         <Meta label="Environment" value={alert.environment} spacious={spacious} />

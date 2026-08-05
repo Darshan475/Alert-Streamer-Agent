@@ -126,13 +126,14 @@ export async function agentGeneratorChat(
 
 export const ALERT_STREAM_SNAPSHOT_EVENT = "alert-stream-snapshot";
 
-import { saveAlertSnapshot } from "@/lib/alertSnapshotCache";
+import { loadAlertSnapshot, mergeSnapshots, saveAlertSnapshot } from "@/lib/alertSnapshotCache";
 
 export function dispatchAlertSnapshot(snapshot: import("./types").StreamSnapshot) {
-  saveAlertSnapshot(snapshot);
+  const merged = mergeSnapshots(loadAlertSnapshot(), snapshot);
+  saveAlertSnapshot(merged);
   if (typeof window !== "undefined") {
     window.dispatchEvent(
-      new CustomEvent(ALERT_STREAM_SNAPSHOT_EVENT, { detail: snapshot })
+      new CustomEvent(ALERT_STREAM_SNAPSHOT_EVENT, { detail: merged })
     );
   }
 }
@@ -140,7 +141,12 @@ export function dispatchAlertSnapshot(snapshot: import("./types").StreamSnapshot
 export async function agentAutoStream(
   count: number,
   hint?: string
-): Promise<{ generated: number; results: import("./types").AlertIngestResponse[] }> {
+): Promise<{
+  generated: number;
+  results: import("./types").AlertIngestResponse[];
+  alerts: import("./types").AlertIngest[];
+  snapshot: import("./types").StreamSnapshot;
+}> {
   return fetchJson("/api/v1/agents/auto-stream", {
     method: "POST",
     headers: { "X-API-Key": API_KEY },

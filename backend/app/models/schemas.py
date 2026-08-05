@@ -165,4 +165,5 @@ class AutoStreamRequest(BaseModel):
 class AutoStreamResponse(BaseModel):
     generated: int
     results: list[AlertIngestResponse]
+    alerts: list[AlertIngest] = Field(default_factory=list)
     snapshot: StreamSnapshot

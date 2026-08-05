@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app.api.alerts import get_pipeline, get_store
 from app.api.security import verify_api_key
 from app.models.schemas import (
+    AlertIngest,
     AlertIngestResponse,
     AutoStreamRequest,
     AutoStreamResponse,
@@ -102,6 +103,7 @@ async def auto_stream(
 ) -> AutoStreamResponse:
     """Agent autonomously generates and ingests multiple alerts."""
     results: list[AlertIngestResponse] = []
+    alerts: list[AlertIngest] = []
     recent_titles: list[str] = []
 
     try:
@@ -109,6 +111,7 @@ async def auto_stream(
             alert = await generator.generate(hint=body.hint, recent_titles=recent_titles)
             response, record = await pipeline.process(alert, store=store)
             results.append(response)
+            alerts.append(alert)
             if response.accepted and record:
                 await store.save(record)
                 recent_titles.append(record.title)
@@ -121,5 +124,6 @@ async def auto_stream(
     return AutoStreamResponse(
         generated=sum(1 for r in results if r.accepted),
         results=results,
+        alerts=alerts,
         snapshot=snapshot,
     )

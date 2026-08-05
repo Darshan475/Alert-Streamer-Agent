@@ -39,3 +39,8 @@ export function teamLabel(team: Team): string {
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleString();
 }
+
+export function incidentIdFromMetadata(metadata: Record<string, unknown> | undefined): string {
+  const id = metadata?.incident_id;
+  return id != null && String(id).trim() ? String(id) : "—";
+}

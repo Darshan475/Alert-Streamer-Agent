@@ -16,7 +16,7 @@ import {
   getAlerts,
   getStats,
 } from "@/lib/api";
-import { loadAlertSnapshot, saveAlertSnapshot } from "@/lib/alertSnapshotCache";
+import { loadAlertSnapshot, mergeSnapshots, saveAlertSnapshot } from "@/lib/alertSnapshotCache";
 import type { AlertRecord, PipelineStats, StreamSnapshot } from "@/lib/types";
 
 const WS_PATH = "/api/v1/alerts/ws";
@@ -48,11 +48,19 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
 
   const applySnapshot = useCallback((snapshot: StreamSnapshot) => {
     if (snapshot.type !== "snapshot") return;
-    setAlerts(snapshot.alerts.items);
-    setStats(snapshot.stats);
+    setAlerts((prev) => {
+      const merged = mergeSnapshots(
+        prev.length > 0
+          ? { type: "snapshot", alerts: { total: prev.length, items: prev }, stats: snapshot.stats }
+          : loadAlertSnapshot(),
+        snapshot
+      );
+      setStats(merged.stats);
+      saveAlertSnapshot(merged);
+      return merged.alerts.items;
+    });
     setHasSnapshot(true);
     setError(null);
-    saveAlertSnapshot(snapshot);
   }, []);
 
   const applyItems = useCallback((items: AlertRecord[], nextStats: PipelineStats) => {
@@ -109,11 +117,7 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
         const msg = JSON.parse(event.data as string) as StreamSnapshot;
         if (msg.type === "snapshot") {
           const cached = loadAlertSnapshot();
-          if (cached && cached.alerts.items.length > msg.alerts.items.length) {
-            applySnapshot(cached);
-          } else {
-            applySnapshot(msg);
-          }
+          applySnapshot(mergeSnapshots(cached, msg));
         }
       } catch {
         /* ignore malformed frames */

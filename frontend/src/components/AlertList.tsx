@@ -5,6 +5,7 @@ import { PipelineFlow } from "./PipelineFlow";
 import type { AlertRecord } from "@/lib/types";
 import {
   formatTime,
+  incidentIdFromMetadata,
   priorityLabel,
   severityColor,
   statusColor,
@@ -85,7 +86,10 @@ const AlertListItem = memo(function AlertListItem({
         </div>
         <ChevronRight className="h-4 w-4 text-slate-600 shrink-0 mt-1" />
       </div>
-      <div className="mt-1.5 flex gap-3 text-[10px] text-slate-500">
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+        <span className="text-cyan-400/90 font-mono">
+          ID {incidentIdFromMetadata(alert.metadata)}
+        </span>
         <span>{alert.service}</span>
         <span>{alert.environment}</span>
         <span>{formatTime(alert.received_at)}</span>

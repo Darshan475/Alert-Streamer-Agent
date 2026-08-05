@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { agentGeneratorChat, dispatchAlertSnapshot, generateAgentAlert, getHealth, getStats } from "@/lib/api";
+import { agentAutoStream, agentGeneratorChat, dispatchAlertSnapshot, generateAgentAlert, getHealth } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
@@ -202,21 +202,21 @@ export function TriggerPage() {
     setRejected(0);
     setDuplicates(0);
 
-    for (let i = 0; i < streamCount; i++) {
-      if (stopRef.current) break;
-      await generateAndIngest();
-      if (delayMs > 0 && !stopRef.current && i < streamCount - 1) {
-        await new Promise((r) => setTimeout(r, delayMs));
-      }
-    }
-
-    setStreaming(false);
     try {
-      await getStats();
-    } catch {
-      /* ignore */
+      const res = await agentAutoStream(streamCount);
+      syncSnapshot(res.snapshot);
+
+      setGenerated((prev) => [...res.alerts, ...prev].slice(0, 12));
+      res.alerts.forEach((alert, i) => {
+        pushEvent(alert, res.results[i] ?? null);
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Auto stream failed";
+      setToast({ message, type: "error" });
+    } finally {
+      setStreaming(false);
     }
-  }, [streaming, backendOk, streamCount, delayMs, generateAndIngest]);
+  }, [streaming, backendOk, streamCount, pushEvent, syncSnapshot]);
 
   const stopStream = () => {
     stopRef.current = true;
