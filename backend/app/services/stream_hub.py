@@ -39,13 +39,16 @@ class StreamHub:
 
     @staticmethod
     async def build_snapshot(store: "AlertStore") -> dict:
+        from app.services.data_masking import mask_record
+
         items, total = await store.list_alerts(limit=100)
         stats = await store.stats()
+        masked = [mask_record(a) for a in items]
         return {
             "type": "snapshot",
             "alerts": {
                 "total": total,
-                "items": [a.model_dump(mode="json") for a in items],
+                "items": [a.model_dump(mode="json") for a in masked],
             },
             "stats": stats.model_dump(mode="json"),
         }

@@ -11,7 +11,12 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from app.api import agents, alerts, llm
-from app.config import DEFAULT_LLM_PROVIDER, DEFAULT_OPENROUTER_MODEL, get_settings
+from app.config import (
+    DEFAULT_LLM_PROVIDER,
+    DEFAULT_NVIDIA_MODEL,
+    DEFAULT_OPENROUTER_MODEL,
+    get_settings,
+)
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
@@ -27,10 +32,16 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 settings = get_settings()
 llm_client = LLMClient(settings)
-llm_client.set_provider(settings.llm_provider or DEFAULT_LLM_PROVIDER)
-_startup_model = settings.llm_model or DEFAULT_OPENROUTER_MODEL
-if "nemotron" in _startup_model.lower() and (settings.llm_provider or DEFAULT_LLM_PROVIDER) == "openrouter":
-    _startup_model = DEFAULT_OPENROUTER_MODEL
+_active_provider = settings.llm_provider or DEFAULT_LLM_PROVIDER
+llm_client.set_provider(_active_provider)
+if _active_provider == "nvidia":
+    _startup_model = settings.llm_model or settings.nvidia_model or DEFAULT_NVIDIA_MODEL
+elif _active_provider == "openrouter":
+    _startup_model = settings.llm_model or DEFAULT_OPENROUTER_MODEL
+    if "nemotron" in _startup_model.lower():
+        _startup_model = DEFAULT_OPENROUTER_MODEL
+else:
+    _startup_model = settings.llm_model or settings.model_for(_active_provider)
 llm_client.set_model(_startup_model)
 alert_store = AlertStore()
 dedup_store = DedupStore(ttl_seconds=settings.dedup_ttl_seconds)
@@ -62,7 +73,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.7.1",
+    version="2.8.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter

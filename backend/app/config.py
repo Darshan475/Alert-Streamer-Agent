@@ -5,7 +5,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LLMProvider = Literal["gemini", "openrouter", "groq", "huggingface", "nvidia", "offline"]
 
-# Provider defaults — OpenRouter + gpt-4o-mini (widely available on OpenRouter free tier)
+# Provider defaults — NVIDIA NIM primary; OpenRouter fallback in UI
+DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3-super-120b-a12b"
 DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini"
 DEFAULT_NEMOTRON_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct"
 
@@ -47,7 +48,7 @@ PLACEHOLDER_KEYS = frozenset(
     }
 )
 
-DEFAULT_LLM_PROVIDER: LLMProvider = "openrouter"
+DEFAULT_LLM_PROVIDER: LLMProvider = "nvidia"
 
 OPENROUTER_MODELS: list[str] = [
     DEFAULT_OPENROUTER_MODEL,
@@ -99,11 +100,11 @@ LLM_PROVIDER_META: dict[LLMProvider, dict[str, str | bool]] = {
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # LLM — default OpenRouter + Nemotron; override via dashboard or env
+    # LLM — default NVIDIA NIM; override via dashboard or env
     llm_provider: LLMProvider = DEFAULT_LLM_PROVIDER
     llm_api_key: str = ""
     llm_base_url: str = ""
-    llm_model: str = DEFAULT_OPENROUTER_MODEL
+    llm_model: str = DEFAULT_NVIDIA_MODEL
     gemini_api_key: str = ""
     google_api_key: str = ""  # alias for GEMINI_API_KEY
     hf_token: str = ""  # HF_TOKEN — alternative to LLM_API_KEY for Hugging Face

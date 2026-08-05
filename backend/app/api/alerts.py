@@ -12,10 +12,12 @@ from app.models.schemas import (
     PipelineStats,
     RawAlertStreamResponse,
 )
-from app.services.llm_client import LLMError
+from app.models.schemas import StreamSnapshot
 from app.services.alert_pipeline import AlertPipeline
 from app.services.alert_store import AlertStore
-from app.services.stream_hub import stream_hub
+from app.services.data_masking import mask_record
+from app.services.llm_client import LLMError
+from app.services.stream_hub import StreamHub, stream_hub
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -85,7 +87,7 @@ async def list_alerts(
     items, total = await store.list_alerts(
         status=status_filter, team=team, limit=limit, offset=offset, exclude_statuses=exclude
     )
-    return AlertListResponse(total=total, items=items)
+    return AlertListResponse(total=total, items=[mask_record(a) for a in items])
 
 
 @router.get("/stats", response_model=PipelineStats)
@@ -100,6 +102,19 @@ async def get_events(
 ) -> dict:
     events = await store.get_events(since_index=since)
     return {"events": events, "next_index": since + len(events)}
+
+
+@router.delete("/clear")
+async def clear_alerts(
+    _: str = Depends(verify_api_key),
+    store: AlertStore = Depends(get_store),
+) -> dict:
+    """Clear all stored alerts and broadcast empty snapshot."""
+    await store.clear()
+    raw = await StreamHub.build_snapshot(store)
+    snapshot = StreamSnapshot.model_validate(raw)
+    await stream_hub.broadcast(store)
+    return {"cleared": True, "snapshot": snapshot.model_dump(mode="json")}
 
 
 @router.websocket("/ws")
@@ -119,6 +134,6 @@ async def get_alert(alert_id: UUID, store: AlertStore = Depends(get_store)) -> A
     alert = await store.get(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
-    return alert
+    return mask_record(alert)
 
 

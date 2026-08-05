@@ -76,7 +76,7 @@ export function LlmSelector({ onChanged, compact = false }: Props) {
         </div>
         <div className="relative min-w-[140px] max-w-[160px]">
           <select
-            value={data?.active_provider ?? "openrouter"}
+            value={data?.active_provider ?? "nvidia"}
             onChange={(e) => void handleProviderChange(e.target.value as LlmProviderId)}
             disabled={isLoading || saving || !data}
             className="w-full appearance-none rounded-lg border border-slate-700 bg-slate-900/80 py-1.5 pl-2.5 pr-8 text-xs text-white focus:border-cyan-500 focus:outline-none disabled:opacity-60"

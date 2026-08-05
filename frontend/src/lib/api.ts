@@ -154,6 +154,16 @@ export async function agentAutoStream(
   });
 }
 
+export async function clearAlerts(): Promise<{
+  cleared: boolean;
+  snapshot: import("./types").StreamSnapshot;
+}> {
+  return fetchJson("/api/v1/alerts/clear", {
+    method: "DELETE",
+    headers: { "X-API-Key": API_KEY },
+  });
+}
+
 export function apiBaseToWs(base: string): string {
   if (base.startsWith("https://")) return base.replace("https://", "wss://");
   if (base.startsWith("http://")) return base.replace("http://", "ws://");

@@ -6,6 +6,12 @@ import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
 import { agentAutoStream, agentGeneratorChat, dispatchAlertSnapshot, generateAgentAlert, getHealth } from "@/lib/api";
+import { maskIngestForDisplay } from "@/lib/maskDisplay";
+import {
+  clearTriggerSession,
+  loadTriggerSession,
+  saveTriggerSession,
+} from "@/lib/triggerSessionCache";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
@@ -16,6 +22,7 @@ import {
   Send,
   Sparkles,
   Square,
+  Trash2,
   XCircle,
   ArrowRight,
   Radio,
@@ -60,7 +67,7 @@ export function TriggerPage() {
   const [streaming, setStreaming] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [delayMs, setDelayMs] = useState(800);
-  const [streamCount, setStreamCount] = useState(5);
+  const [streamCount, setStreamCount] = useState(7);
   const [sent, setSent] = useState(0);
   const [accepted, setAccepted] = useState(0);
   const [rejected, setRejected] = useState(0);
@@ -78,7 +85,41 @@ export function TriggerPage() {
     getHealth()
       .then(() => setBackendOk(true))
       .catch(() => setBackendOk(false));
+
+    const saved = loadTriggerSession();
+    if (saved) {
+      setGenerated(saved.generated);
+      setEvents(
+        saved.events.map((ev) => ({
+          ...ev,
+          ts: new Date(ev.ts),
+          status: ev.status as StreamEvent["status"],
+        }))
+      );
+      setSent(saved.metrics.sent);
+      setAccepted(saved.metrics.accepted);
+      setRejected(saved.metrics.rejected);
+      setDuplicates(saved.metrics.duplicates);
+      setStreamCount(saved.streamCount || 7);
+    }
   }, []);
+
+  useEffect(() => {
+    saveTriggerSession({
+      generated,
+      events: events.map((ev) => ({
+        id: ev.id,
+        ts: ev.ts.toISOString(),
+        title: ev.title,
+        status: ev.status,
+        message: ev.message,
+        source: ev.source,
+        severity: ev.severity,
+      })),
+      metrics: { sent, accepted, rejected, duplicates },
+      streamCount,
+    });
+  }, [generated, events, sent, accepted, rejected, duplicates, streamCount]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
@@ -130,8 +171,9 @@ export function TriggerPage() {
       setGenerating(true);
       try {
         const res = await generateAgentAlert();
-        setGenerated((prev) => [res.alert, ...prev].slice(0, 12));
-        pushEvent(res.alert, res.ingest);
+        const display = maskIngestForDisplay(res.alert);
+        setGenerated((prev) => [display, ...prev].slice(0, 12));
+        pushEvent(display, res.ingest);
         syncSnapshot(res.snapshot);
         return res;
       } catch (err) {
@@ -175,8 +217,9 @@ export function TriggerPage() {
       syncSnapshot(res.snapshot);
 
       if (res.alerts.length > 0) {
-        setGenerated((prev) => [...res.alerts, ...prev].slice(0, 12));
-        res.alerts.forEach((alert, i) => {
+        const masked = res.alerts.map(maskIngestForDisplay);
+        setGenerated((prev) => [...masked, ...prev].slice(0, 12));
+        masked.forEach((alert, i) => {
           pushEvent(alert, res.results[i] ?? null);
         });
       }
@@ -206,9 +249,9 @@ export function TriggerPage() {
       const res = await agentAutoStream(streamCount);
       syncSnapshot(res.snapshot);
 
-      setGenerated((prev) => [...res.alerts, ...prev].slice(0, 12));
+      setGenerated((prev) => [...res.alerts.map(maskIngestForDisplay), ...prev].slice(0, 12));
       res.alerts.forEach((alert, i) => {
-        pushEvent(alert, res.results[i] ?? null);
+        pushEvent(maskIngestForDisplay(alert), res.results[i] ?? null);
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Auto stream failed";
@@ -217,6 +260,18 @@ export function TriggerPage() {
       setStreaming(false);
     }
   }, [streaming, backendOk, streamCount, pushEvent, syncSnapshot]);
+
+  const clearLocal = useCallback(() => {
+    setGenerated([]);
+    setEvents([]);
+    setSent(0);
+    setAccepted(0);
+    setRejected(0);
+    setDuplicates(0);
+    setChatMessages([]);
+    clearTriggerSession();
+    setToast({ message: "Trigger preview and stream log cleared.", type: "success" });
+  }, []);
 
   const stopStream = () => {
     stopRef.current = true;
@@ -259,7 +314,7 @@ export function TriggerPage() {
                     disabled={streaming}
                     className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-white"
                   >
-                    {[7, 10, 15].map((n) => (
+                    {[5, 7, 10, 15].map((n) => (
                       <option key={n} value={n}>{n}</option>
                     ))}
                   </select>
@@ -378,9 +433,20 @@ export function TriggerPage() {
             </div>
 
             <div className="flex flex-col flex-1 min-h-0 gap-2">
-              <h2 className="shrink-0 text-sm font-medium text-slate-400 uppercase tracking-wider">
-                Generated Preview ({generated.length})
-              </h2>
+              <div className="shrink-0 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+                  Generated Preview ({generated.length})
+                </h2>
+                <button
+                  type="button"
+                  onClick={clearLocal}
+                  disabled={generated.length === 0 && events.length === 0}
+                  className="flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-red-300 hover:border-red-500/40 disabled:opacity-40"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Clear local
+                </button>
+              </div>
               <div className="flex-1 min-h-[160px] lg:min-h-0 overflow-y-auto pr-1 scroll-panel space-y-2">
                 {generated.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-10 h-full flex items-center justify-center border border-dashed border-slate-700 rounded-xl">

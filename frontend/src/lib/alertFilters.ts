@@ -24,3 +24,18 @@ export function computeFilterCounts(alerts: AlertRecord[]): Record<string, numbe
     duplicate: alerts.filter((a) => a.status === "duplicate").length,
   };
 }
+
+export function searchAlerts(alerts: AlertRecord[], query: string): AlertRecord[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return alerts;
+  return alerts.filter((a) => {
+    const incidentId = String(a.metadata?.incident_id ?? "").toLowerCase();
+    return (
+      a.title.toLowerCase().includes(q) ||
+      a.description.toLowerCase().includes(q) ||
+      a.service.toLowerCase().includes(q) ||
+      a.status.toLowerCase().includes(q) ||
+      incidentId.includes(q)
+    );
+  });
+}

@@ -9,6 +9,7 @@ from typing import TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from app.models.schemas import AlertIngest, AlertSeverity
+from app.services.data_masking import mask_ingest
 from app.services.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ Respond ONLY with valid JSON (no markdown):
   "title": "Warn: [P3][PSS BWS]LOW SQS MESSAGE VOLUME DETECTED_propertyupdate",
   "description": "Operational summary with impact and affected service.",
   "severity": "medium",
-  "service": "digitalpromosmiscservices-prd",
+  "service": "xyzabc-prd",
   "environment": "production",
   "metric_value": 12.5,
   "threshold": 5.0,
@@ -29,7 +30,7 @@ Respond ONLY with valid JSON (no markdown):
   "namespace": "pss-bws",
   "pod_name": null,
   "region": "us-east-1",
-  "tags": ["pss-bws", "p3", "datadog", "prod"],
+  "tags": ["pss-dws", "p3", "datadog", "prod"],
   "metadata": {
     "incident_id": "859405",
     "opened_date": "7/22/2026",
@@ -45,7 +46,7 @@ Title rules (match enterprise format exactly):
 - Warn style: Warn: [P3][PSS BWS]{UPPERCASE_ALERT_NAME}_{property}
   Example: Warn: [P3][PSS BWS]LOW SQS MESSAGE VOLUME DETECTED_propertyupdate
 - Triggered style: Triggered: [P3][PSS BWS] {api_path} 5xx error rate- Prod - Tally {service}-prd
-  Example: Triggered: [P3][PSS BWS] /whgservices/loyalty/v4/member/promotionregistertoken 5xx error rate- Prod - Tally digitalpromosmiscservices-prd
+  Example: Triggered: [P3][PSS BWS] /xxxxxx/loyalty/v4/member/xxysys 5xx error rate- Prod - Tally digitalpromosmiscservices-prd
 
 Always use severity "medium" and priority_label "3-Medium" for P3 alerts.
 incident_id must be a unique 6-digit number. opened_date as M/D/YYYY.
@@ -66,8 +67,8 @@ class AlertGeneratorAgent:
 
     TEMPLATE_WARN = "Warn: [P3][PSS BWS]LOW SQS MESSAGE VOLUME DETECTED_propertyupdate"
     TEMPLATE_TRIGGERED = (
-        "Triggered: [P3][PSS BWS] /whgservices/loyalty/v4/member/promotionregistertoken "
-        "5xx error rate- Prod - Tally digitalpromosmiscservices-prd"
+        "Triggered: [P3][PSS BWS] /xyzserives/loyalty/v4/member/xyzsss "
+        "5xx error rate- Prod - Tally dservices-prd"
     )
 
     def __init__(self, llm: LLMClient) -> None:
@@ -154,7 +155,8 @@ class AlertGeneratorAgent:
             else f"propertyupdate-{incident_id[-3]}"
         )
 
-        return AlertIngest(
+        return mask_ingest(
+            AlertIngest(
             source="datadog",
             alert_type="sqs_volume" if use_warn else "api_5xx",
             title=title,
@@ -183,6 +185,7 @@ class AlertGeneratorAgent:
                 "fallback": True,
             },
             timestamp=now,
+            )
         )
 
     def _to_ingest(self, data: dict) -> AlertIngest:
@@ -210,7 +213,8 @@ class AlertGeneratorAgent:
         service = data.get("service") or "pss-bws"
         alert_type = data.get("alert_type") or ("api_5xx" if "5xx" in title else "sqs_volume")
 
-        return AlertIngest(
+        return mask_ingest(
+            AlertIngest(
             source=str(data.get("source") or "datadog").lower(),
             alert_type=alert_type,
             title=title[:512],
@@ -227,4 +231,5 @@ class AlertGeneratorAgent:
             tags=data.get("tags") or ["pss-bws", "p3", "datadog"],
             metadata=meta,
             timestamp=now,
+            )
         )

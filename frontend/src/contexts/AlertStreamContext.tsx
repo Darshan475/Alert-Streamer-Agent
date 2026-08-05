@@ -13,10 +13,11 @@ import {
   ALERT_STREAM_SNAPSHOT_EVENT,
   API_BASE,
   apiBaseToWs,
+  clearAlerts,
   getAlerts,
   getStats,
 } from "@/lib/api";
-import { loadAlertSnapshot, mergeSnapshots, saveAlertSnapshot } from "@/lib/alertSnapshotCache";
+import { clearAlertSnapshot, loadAlertSnapshot, mergeSnapshots, saveAlertSnapshot } from "@/lib/alertSnapshotCache";
 import type { AlertRecord, PipelineStats, StreamSnapshot } from "@/lib/types";
 
 const WS_PATH = "/api/v1/alerts/ws";
@@ -31,6 +32,7 @@ interface AlertStreamContextValue {
   isLoading: boolean;
   reconnect: () => void;
   applySnapshot: (snapshot: StreamSnapshot) => void;
+  clearAll: () => Promise<void>;
 }
 
 const AlertStreamContext = createContext<AlertStreamContextValue | null>(null);
@@ -168,6 +170,12 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
     connect();
   }, [connect]);
 
+  const clearAll = useCallback(async () => {
+    const res = await clearAlerts();
+    clearAlertSnapshot();
+    applySnapshot(res.snapshot);
+  }, [applySnapshot]);
+
   return (
     <AlertStreamContext.Provider
       value={{
@@ -179,6 +187,7 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
         isLoading: !hasSnapshot,
         reconnect,
         applySnapshot,
+        clearAll,
       }}
     >
       {children}
