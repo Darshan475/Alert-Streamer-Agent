@@ -12,7 +12,6 @@ import {
   Bot,
   CheckCircle2,
   Loader2,
-  MessageSquare,
   Play,
   Send,
   Sparkles,
@@ -21,6 +20,13 @@ import {
   ArrowRight,
   Radio,
 } from "lucide-react";
+
+const SUGGESTED_PROMPTS = [
+  "Generate 2 prioritized alerts",
+  "Provide duplicate data",
+  "Create 2 rejected alerts",
+  "Show resolved alert data",
+] as const;
 
 interface ChatMessage {
   id: string;
@@ -62,13 +68,7 @@ export function TriggerPage() {
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      text: "Ask for custom alert data — e.g. \"provide 2 duplicate alerts\", \"create rejected data\", or \"show resolved alerts\".",
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const stopRef = useRef(false);
   const logRef = useRef<HTMLDivElement>(null);
@@ -158,11 +158,11 @@ export function TriggerPage() {
     [pushEvent, syncSnapshot]
   );
 
-  const sendChat = useCallback(async () => {
-    const text = chatInput.trim();
+  const sendChat = useCallback(async (textOverride?: string) => {
+    const text = (textOverride ?? chatInput).trim();
     if (!text || chatLoading || backendOk === false) return;
 
-    setChatInput("");
+    if (!textOverride) setChatInput("");
     setChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text }]);
     setChatLoading(true);
 
@@ -249,94 +249,109 @@ export function TriggerPage() {
               <Sparkles className="h-3.5 w-3.5 text-violet-400" />
               Alert Generator
             </h2>
-            <div className="shrink-0 w-full rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 px-3 py-2.5 sm:px-4">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="shrink-0 rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-500/5 to-cyan-500/5 flex flex-col overflow-hidden">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 border-b border-slate-800/50">
                 <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
-                    Count
-                    <select
-                      value={streamCount}
-                      onChange={(e) => setStreamCount(Number(e.target.value))}
-                      disabled={streaming}
-                      className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
-                    >
-                      {[7, 10,15].map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                  </label>
+                  Count
+                  <select
+                    value={streamCount}
+                    onChange={(e) => setStreamCount(Number(e.target.value))}
+                    disabled={streaming}
+                    className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-white"
+                  >
+                    {[7, 10, 15].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
                 <label className="flex items-center gap-1.5 text-xs text-slate-500 shrink-0">
-                    Delay
-                    <select
-                      value={delayMs}
-                      onChange={(e) => setDelayMs(Number(e.target.value))}
-                      disabled={streaming}
-                      className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
-                    >
-                      <option value={0}>Instant</option>
-                      <option value={500}>500ms</option>
-                      <option value={800}>800ms</option>
-                      <option value={1500}>1.5s</option>
-                    </select>
-                  </label>
+                  Delay
+                  <select
+                    value={delayMs}
+                    onChange={(e) => setDelayMs(Number(e.target.value))}
+                    disabled={streaming}
+                    className="rounded border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-white"
+                  >
+                    <option value={0}>Instant</option>
+                    <option value={500}>500ms</option>
+                    <option value={800}>800ms</option>
+                    <option value={1500}>1.5s</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void generateAndIngest()}
+                  disabled={generating || streaming || backendOk === false}
+                  className="flex items-center gap-1 rounded-lg border border-violet-500/40 bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40 shrink-0"
+                >
+                  <Bot className="h-3 w-3" />
+                  Generate One
+                </button>
+                {streaming ? (
                   <button
                     type="button"
-                    onClick={() => void generateAndIngest()}
-                    disabled={generating || streaming || backendOk === false}
-                    className="flex items-center gap-1.5 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-300 hover:bg-violet-500/20 disabled:opacity-40 shrink-0"
+                    onClick={stopStream}
+                    className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-300"
                   >
-                    <Bot className="h-3 w-3" />
-                    Generate One
+                    <Square className="h-3 w-3" />
+                    Stop
                   </button>
-                  {streaming ? (
-                    <button
-                      type="button"
-                      onClick={stopStream}
-                      className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-300"
-                    >
-                      <Square className="h-3 w-3" />
-                      Stop
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void autoStream()}
-                      disabled={backendOk === false}
-                      className="flex items-center gap-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
-                    >
-                      <Play className="h-3 w-3" />
-                      Auto Stream
-                    </button>
-                  )}
-              </div>
-            </div>
-
-            <div className="shrink-0 rounded-xl border border-slate-700/70 bg-slate-900/40 flex flex-col min-h-[140px] max-h-[180px]">
-              <div className="shrink-0 px-3 py-1.5 border-b border-slate-800 flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide">
-                <MessageSquare className="h-3 w-3 text-violet-400" />
-                Generator Chat
-              </div>
-              <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-2 text-xs scroll-panel">
-                {chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`rounded-lg px-2.5 py-1.5 whitespace-pre-wrap ${
-                      msg.role === "user"
-                        ? "ml-6 bg-violet-500/15 text-violet-100"
-                        : "mr-4 bg-slate-800/80 text-slate-300"
-                    }`}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void autoStream()}
+                    disabled={backendOk === false}
+                    className="flex items-center gap-1 rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-2.5 py-1 text-xs font-medium text-cyan-300 hover:bg-cyan-500/20 disabled:opacity-40"
                   >
-                    {msg.text}
-                  </div>
-                ))}
-                {chatLoading && (
-                  <div className="flex items-center gap-2 text-slate-500 px-1">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Processing…
-                  </div>
+                    <Play className="h-3 w-3" />
+                    Auto Stream
+                  </button>
                 )}
               </div>
+
+              <div className="flex flex-wrap gap-1.5 px-3 py-1.5 border-b border-slate-800/50">
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    disabled={chatLoading || backendOk === false}
+                    onClick={() => void sendChat(prompt)}
+                    className="rounded-full border border-slate-700/80 bg-slate-900/60 px-2.5 py-0.5 text-[10px] text-slate-400 hover:text-violet-300 hover:border-violet-500/40 hover:bg-violet-500/10 disabled:opacity-40 transition-colors"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              {chatMessages.length > 0 && (
+                <div
+                  ref={chatRef}
+                  className="max-h-[72px] overflow-y-auto px-3 py-1.5 space-y-1 text-[11px] scroll-panel"
+                >
+                  {chatMessages.slice(-4).map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`rounded px-2 py-0.5 truncate ${
+                        msg.role === "user"
+                          ? "text-violet-300"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      <span className="font-medium">{msg.role === "user" ? "You: " : "AI: "}</span>
+                      {msg.text}
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div className="flex items-center gap-1.5 text-slate-500">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Processing…
+                    </div>
+                  )}
+                </div>
+              )}
+
               <form
-                className="shrink-0 flex gap-2 p-2 border-t border-slate-800"
+                className="flex gap-1.5 p-2 border-t border-slate-800/50"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void sendChat();
@@ -347,14 +362,14 @@ export function TriggerPage() {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   disabled={chatLoading || backendOk === false}
-                  placeholder="e.g. provide 2 duplicate alerts"
+                  placeholder="Ask for alert data…"
                   maxLength={500}
-                  className="flex-1 min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
                 />
                 <button
                   type="submit"
                   disabled={chatLoading || !chatInput.trim() || backendOk === false}
-                  className="shrink-0 rounded-lg border border-violet-500/40 bg-violet-500/10 px-2.5 py-1.5 text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
+                  className="shrink-0 rounded-lg border border-violet-500/40 bg-violet-500/10 px-2 py-1 text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
                   aria-label="Send chat message"
                 >
                   <Send className="h-3.5 w-3.5" />

@@ -126,7 +126,10 @@ export async function agentGeneratorChat(
 
 export const ALERT_STREAM_SNAPSHOT_EVENT = "alert-stream-snapshot";
 
+import { saveAlertSnapshot } from "@/lib/alertSnapshotCache";
+
 export function dispatchAlertSnapshot(snapshot: import("./types").StreamSnapshot) {
+  saveAlertSnapshot(snapshot);
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent(ALERT_STREAM_SNAPSHOT_EVENT, { detail: snapshot })
