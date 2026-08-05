@@ -44,6 +44,19 @@ export function mergeSnapshots(
   };
 }
 
+export function emptySnapshot(): StreamSnapshot {
+  return {
+    type: "snapshot",
+    alerts: { total: 0, items: [] },
+    stats: {
+      total_alerts: 0,
+      by_status: {},
+      by_priority: {},
+      by_team: {},
+    },
+  };
+}
+
 export function saveAlertSnapshot(snapshot: StreamSnapshot): void {
   if (typeof window === "undefined") return;
   try {

@@ -17,7 +17,13 @@ import {
   getAlerts,
   getStats,
 } from "@/lib/api";
-import { clearAlertSnapshot, loadAlertSnapshot, mergeSnapshots, saveAlertSnapshot } from "@/lib/alertSnapshotCache";
+import {
+  clearAlertSnapshot,
+  loadAlertSnapshot,
+  mergeSnapshots,
+  saveAlertSnapshot,
+} from "@/lib/alertSnapshotCache";
+import { clearTriggerSession } from "@/lib/triggerSessionCache";
 import type { AlertRecord, PipelineStats, StreamSnapshot } from "@/lib/types";
 
 const WS_PATH = "/api/v1/alerts/ws";
@@ -48,6 +54,15 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
   const mountedRef = useRef(true);
   const bootstrappedRef = useRef(false);
 
+  const replaceSnapshot = useCallback((snapshot: StreamSnapshot) => {
+    if (snapshot.type !== "snapshot") return;
+    setAlerts(snapshot.alerts.items);
+    setStats(snapshot.stats);
+    setHasSnapshot(true);
+    setError(null);
+    saveAlertSnapshot(snapshot);
+  }, []);
+
   const applySnapshot = useCallback((snapshot: StreamSnapshot) => {
     if (snapshot.type !== "snapshot") return;
     setAlerts((prev) => {
@@ -66,21 +81,17 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyItems = useCallback((items: AlertRecord[], nextStats: PipelineStats) => {
-    setAlerts(items);
-    setStats(nextStats);
-    setHasSnapshot(true);
-    setError(null);
-    saveAlertSnapshot({
+    replaceSnapshot({
       type: "snapshot",
       alerts: { total: items.length, items },
       stats: nextStats,
     });
-  }, []);
+  }, [replaceSnapshot]);
 
   useEffect(() => {
     const cached = loadAlertSnapshot();
-    if (cached) applySnapshot(cached);
-  }, [applySnapshot]);
+    if (cached) replaceSnapshot(cached);
+  }, [replaceSnapshot]);
 
   useEffect(() => {
     if (bootstrappedRef.current) return;
@@ -90,7 +101,7 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
         if (!mountedRef.current) return;
         const cached = loadAlertSnapshot();
         if (cached && cached.alerts.items.length >= list.items.length) {
-          applySnapshot(cached);
+          replaceSnapshot(cached);
         } else {
           applyItems(list.items, nextStats);
         }
@@ -98,7 +109,7 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
       .catch(() => {
         /* WebSocket will retry */
       });
-  }, [applyItems, applySnapshot]);
+  }, [applyItems, replaceSnapshot]);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -118,8 +129,7 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
       try {
         const msg = JSON.parse(event.data as string) as StreamSnapshot;
         if (msg.type === "snapshot") {
-          const cached = loadAlertSnapshot();
-          applySnapshot(mergeSnapshots(cached, msg));
+          replaceSnapshot(msg);
         }
       } catch {
         /* ignore malformed frames */
@@ -137,7 +147,7 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
       wsRef.current = null;
       reconnectRef.current = setTimeout(connect, RECONNECT_MS);
     };
-  }, [applySnapshot, hasSnapshot]);
+  }, [replaceSnapshot, hasSnapshot]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -173,8 +183,9 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
   const clearAll = useCallback(async () => {
     const res = await clearAlerts();
     clearAlertSnapshot();
-    applySnapshot(res.snapshot);
-  }, [applySnapshot]);
+    clearTriggerSession();
+    replaceSnapshot(res.snapshot);
+  }, [replaceSnapshot]);
 
   return (
     <AlertStreamContext.Provider

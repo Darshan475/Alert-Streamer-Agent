@@ -128,3 +128,6 @@ class AlertStore:
         self._alerts.clear()
         self._events.clear()
         self._persist()
+        from app.services.stream_hub import stream_hub
+
+        await stream_hub.broadcast(self)

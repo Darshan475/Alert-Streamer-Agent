@@ -113,7 +113,6 @@ async def clear_alerts(
     await store.clear()
     raw = await StreamHub.build_snapshot(store)
     snapshot = StreamSnapshot.model_validate(raw)
-    await stream_hub.broadcast(store)
     return {"cleared": True, "snapshot": snapshot.model_dump(mode="json")}
 
 
