@@ -447,7 +447,7 @@ export function TriggerPage() {
                   Clear local
                 </button>
               </div>
-              <div className="flex-1 min-h-[160px] lg:min-h-0 overflow-y-auto pr-1 scroll-panel space-y-2">
+              <div className="flex-1 min-h-[160px] lg:min-h-0 overflow-y-auto pr-1 scroll-panel space-y-1.5">
                 {generated.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-10 h-full flex items-center justify-center border border-dashed border-slate-700 rounded-xl">
                     No alerts yet — click Generate One
@@ -531,29 +531,28 @@ function GeneratedPreviewCard({
   row: ReturnType<typeof alertRowMeta>;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700/70 bg-slate-900/60 p-3 sm:p-4 space-y-2">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-        <div>
-          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">ID</span>
-          <span className="text-cyan-400 font-mono text-sm">{row.id}</span>
-        </div>
-        <div>
-          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">Date</span>
-          <span className="text-slate-200 text-sm">{row.date}</span>
-        </div>
-        <div>
-          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">Priority</span>
-          <span className="text-amber-300 text-sm">{row.priority}</span>
-        </div>
-        <div>
-          <span className="text-slate-500 block text-[10px] uppercase tracking-wide">Tool</span>
-          <span className="text-slate-200 text-sm">{row.monitor}</span>
-        </div>
+    <div className="rounded-lg border border-slate-700/70 bg-slate-900/60 px-2.5 py-2">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[9px] sm:text-[10px] text-slate-500 mb-1">
+        <span className="text-cyan-400 font-mono shrink-0">ID {row.id}</span>
+        <span className="shrink-0">{row.date}</span>
+        <span className="text-amber-300 shrink-0">{row.priority}</span>
+        <span className="shrink-0">{row.monitor}</span>
+        <span className="rounded border border-yellow-500/30 px-1 py-px text-yellow-300/90 capitalize shrink-0">
+          {alert.severity}
+        </span>
+        <span className="truncate min-w-0 text-slate-400 sm:hidden">{alert.service}</span>
       </div>
-      <p className="text-sm sm:text-base text-white leading-snug break-words">{alert.title}</p>
-      {alert.description && alert.description !== alert.title && (
-        <p className="text-xs text-slate-400 line-clamp-2">{alert.description}</p>
-      )}
+      <div className="flex items-center gap-2 min-w-0">
+        <p className="text-xs sm:text-sm text-white leading-snug truncate min-w-0 flex-[1.3]">
+          {alert.title}
+        </p>
+        {alert.description && alert.description !== alert.title && (
+          <p className="text-[10px] sm:text-xs text-slate-400 truncate min-w-0 flex-1 hidden sm:block">
+            {alert.description}
+          </p>
+        )}
+        <span className="text-[9px] text-slate-500 shrink-0 hidden md:inline">{alert.service}</span>
+      </div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ export const AlertList = memo(function AlertList({ alerts, selectedId, onSelect 
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {alerts.map((alert) => (
         <AlertListItem
           key={alert.id}
@@ -58,41 +58,63 @@ const AlertListItem = memo(function AlertListItem({
     <button
       type="button"
       onClick={handleClick}
-      className={`w-full text-left rounded-xl border p-3.5 transition-colors hover:border-cyan-500/40 ${
+      className={`w-full text-left rounded-lg border px-2.5 py-2 transition-colors hover:border-cyan-500/40 ${
         selected
           ? "border-cyan-500/60 bg-cyan-500/5 ring-1 ring-cyan-500/20"
           : "border-slate-700/60 bg-slate-900/40"
       }`}
     >
-      <PipelineFlow alert={alert} className="mb-2.5" />
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-            <span
-              className={`rounded border px-1.5 py-0.5 text-[10px] font-medium ${severityColor(alert.severity)}`}
-            >
-              {alert.severity}
-            </span>
-            <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
-              {priorityLabel(alert.priority)}
-            </span>
-            <span className="text-[10px] text-slate-500">{teamLabel(alert.team)}</span>
-            <span className={`text-[10px] capitalize ${statusColor(alert.status)}`}>
-              {alert.status.replace("_", " ")}
-            </span>
-          </div>
-          <h3 className="font-medium text-white truncate text-sm">{alert.title}</h3>
-          <p className="text-xs text-slate-400 mt-0.5 line-clamp-1">{alert.description}</p>
+      <div className="flex items-center gap-2 min-w-0">
+        <PipelineFlow alert={alert} compact className="shrink-0 max-w-[48%] lg:max-w-none lg:flex-1 min-w-0" />
+        <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto">
+          <span
+            className={`rounded border px-1 py-px text-[9px] font-medium ${severityColor(alert.severity)}`}
+          >
+            {alert.severity}
+          </span>
+          <span className="rounded bg-slate-800 px-1 py-px text-[9px] text-slate-300">
+            {priorityLabel(alert.priority)}
+          </span>
+          <span className="text-[9px] text-slate-500">{teamLabel(alert.team)}</span>
+          <span className={`text-[9px] capitalize ${statusColor(alert.status)}`}>
+            {alert.status.replace("_", " ")}
+          </span>
         </div>
-        <ChevronRight className="h-4 w-4 text-slate-600 shrink-0 mt-1" />
+        <ChevronRight className="h-3.5 w-3.5 text-slate-600 shrink-0" />
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
-        <span className="text-cyan-400/90 font-mono">
+
+      <div className="mt-1 flex items-center gap-2 min-w-0">
+        <h3 className="font-medium text-white truncate text-xs sm:text-sm min-w-0 flex-[1.4]">
+          {alert.title}
+        </h3>
+        <p className="text-[10px] sm:text-xs text-slate-400 truncate min-w-0 flex-1 hidden md:block">
+          {alert.description}
+        </p>
+        <div className="flex items-center gap-1.5 shrink-0 text-[9px] sm:text-[10px] text-slate-500 whitespace-nowrap ml-auto">
+          <span className="text-cyan-400/90 font-mono hidden lg:inline">
+            ID {incidentIdFromMetadata(alert.metadata)}
+          </span>
+          <span className="hidden xl:inline">{alert.service}</span>
+          <span className="hidden sm:inline">{alert.environment}</span>
+          <span>{formatTime(alert.received_at)}</span>
+        </div>
+      </div>
+
+      <div className="mt-0.5 flex sm:hidden items-center gap-1.5 flex-wrap">
+        <span
+          className={`rounded border px-1 py-px text-[9px] font-medium ${severityColor(alert.severity)}`}
+        >
+          {alert.severity}
+        </span>
+        <span className="rounded bg-slate-800 px-1 py-px text-[9px] text-slate-300">
+          {priorityLabel(alert.priority)}
+        </span>
+        <span className={`text-[9px] capitalize ${statusColor(alert.status)}`}>
+          {alert.status.replace("_", " ")}
+        </span>
+        <span className="text-[9px] text-cyan-400/90 font-mono">
           ID {incidentIdFromMetadata(alert.metadata)}
         </span>
-        <span>{alert.service}</span>
-        <span>{alert.environment}</span>
-        <span>{formatTime(alert.received_at)}</span>
       </div>
     </button>
   );

@@ -88,7 +88,7 @@ export function AlertsPage() {
         setToast({ message, type: "success" });
       }}
     >
-      <div className="relative h-full max-w-5xl mx-auto w-full px-4 py-4 flex flex-col gap-3">
+      <div className="relative h-full max-w-7xl mx-auto w-full px-4 py-4 flex flex-col gap-3">
         {isLoading && (
           <div className="shrink-0 flex items-center gap-2 text-xs text-slate-500">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
