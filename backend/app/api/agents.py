@@ -1,12 +1,21 @@
-"""Agent API — generate alerts and auto-stream through the pipeline."""
+"""Agent API — generate alerts, chat, and auto-stream through the pipeline."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from pydantic import BaseModel, Field
 
 from app.api.alerts import get_pipeline, get_store
 from app.api.security import verify_api_key
-from app.models.schemas import AlertIngest, AlertIngestResponse
+from app.models.schemas import (
+    AlertIngestResponse,
+    AutoStreamRequest,
+    AutoStreamResponse,
+    ChatRequest,
+    ChatResponse,
+    GenerateAlertRequest,
+    GenerateAlertResponse,
+    StreamSnapshot,
+)
 from app.services.alert_generator_agent import AlertGeneratorAgent
+from app.services.generator_chat_agent import GeneratorChatAgent, build_snapshot
 from app.services.llm_client import LLMError
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -18,23 +27,15 @@ def get_generator() -> AlertGeneratorAgent:
     return alert_generator
 
 
-class GenerateAlertRequest(BaseModel):
-    hint: str | None = Field(None, max_length=500)
+def get_chat_agent() -> GeneratorChatAgent:
+    from app.main import generator_chat_agent
+
+    return generator_chat_agent
 
 
-class GenerateAlertResponse(BaseModel):
-    alert: AlertIngest
-    ingest: AlertIngestResponse
-
-
-class AutoStreamRequest(BaseModel):
-    count: int = Field(5, ge=1, le=20)
-    hint: str | None = None
-
-
-class AutoStreamResponse(BaseModel):
-    generated: int
-    results: list[AlertIngestResponse]
+async def _snapshot_response(store) -> StreamSnapshot:
+    raw = await build_snapshot(store)
+    return StreamSnapshot.model_validate(raw)
 
 
 @router.post("/generate-alert", response_model=GenerateAlertResponse)
@@ -56,13 +57,38 @@ async def generate_alert(
         response, record = await pipeline.process(alert, store=store)
         if response.accepted and record:
             await store.save(record)
-        return GenerateAlertResponse(alert=alert, ingest=response)
+        snapshot = await _snapshot_response(store)
+        return GenerateAlertResponse(alert=alert, ingest=response, snapshot=snapshot)
     except LLMError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def generator_chat(
+    body: ChatRequest,
+    _: str = Depends(verify_api_key),
+    chat_agent: GeneratorChatAgent = Depends(get_chat_agent),
+    store=Depends(get_store),
+) -> ChatResponse:
+    """Natural-language alert requests with guardrails (duplicate, rejected, resolved, etc.)."""
+    try:
+        result = await chat_agent.handle(body.message, store=store)
+        snapshot = await _snapshot_response(store)
+        return ChatResponse(
+            reply=result.reply,
+            blocked=result.blocked,
+            results=result.results,
+            alerts=result.alerts,
+            snapshot=snapshot,
+        )
+    except LLMError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
 
 
 @router.post("/auto-stream", response_model=AutoStreamResponse)
@@ -91,7 +117,9 @@ async def auto_stream(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
+    snapshot = await _snapshot_response(store)
     return AutoStreamResponse(
         generated=sum(1 for r in results if r.accepted),
         results=results,
+        snapshot=snapshot,
     )

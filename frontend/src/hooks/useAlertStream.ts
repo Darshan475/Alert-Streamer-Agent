@@ -1,17 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_BASE, apiBaseToWs, getAlerts, getStats } from "@/lib/api";
-import type { AlertRecord, PipelineStats } from "@/lib/types";
+import { API_BASE, apiBaseToWs, getAlerts, getStats, ALERT_STREAM_SNAPSHOT_EVENT } from "@/lib/api";
+import type { AlertRecord, PipelineStats, StreamSnapshot } from "@/lib/types";
 
 const WS_PATH = "/api/v1/alerts/ws";
 const RECONNECT_MS = 5000;
 
-interface StreamSnapshot {
-  type: "snapshot";
-  alerts: { total: number; items: AlertRecord[] };
-  stats: PipelineStats;
-}
+interface StreamSnapshotMessage extends StreamSnapshot {}
 
 export function useAlertStream() {
   const [alerts, setAlerts] = useState<AlertRecord[]>([]);
@@ -34,7 +30,7 @@ export function useAlertStream() {
   useEffect(() => {
     if (bootstrappedRef.current) return;
     bootstrappedRef.current = true;
-    Promise.all([getAlerts({ limit: 100 }), getStats()])
+    Promise.all([getAlerts({ limit: 100, include_duplicates: true }), getStats()])
       .then(([list, nextStats]) => {
         if (!mountedRef.current) return;
         applySnapshot(list.items, nextStats);
@@ -60,7 +56,7 @@ export function useAlertStream() {
     ws.onmessage = (event) => {
       if (!mountedRef.current) return;
       try {
-        const msg = JSON.parse(event.data as string) as StreamSnapshot;
+        const msg = JSON.parse(event.data as string) as StreamSnapshotMessage;
         if (msg.type === "snapshot") {
           applySnapshot(msg.alerts.items, msg.stats);
         }
@@ -86,6 +82,14 @@ export function useAlertStream() {
     mountedRef.current = true;
     connect();
 
+    const onSnapshot = (event: Event) => {
+      const detail = (event as CustomEvent<StreamSnapshot>).detail;
+      if (detail?.type === "snapshot") {
+        applySnapshot(detail.alerts.items, detail.stats);
+      }
+    };
+    window.addEventListener(ALERT_STREAM_SNAPSHOT_EVENT, onSnapshot);
+
     const heartbeat = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send("ping");
@@ -94,12 +98,13 @@ export function useAlertStream() {
 
     return () => {
       mountedRef.current = false;
+      window.removeEventListener(ALERT_STREAM_SNAPSHOT_EVENT, onSnapshot);
       clearInterval(heartbeat);
       if (reconnectRef.current) clearTimeout(reconnectRef.current);
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [connect]);
+  }, [connect, applySnapshot]);
 
   const reconnect = useCallback(() => {
     wsRef.current?.close();

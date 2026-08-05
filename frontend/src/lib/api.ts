@@ -50,11 +50,13 @@ export async function getAlerts(params?: {
   status?: string;
   team?: string;
   limit?: number;
+  include_duplicates?: boolean;
 }): Promise<import("./types").AlertListResponse> {
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);
   if (params?.team) qs.set("team", params.team);
   if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.include_duplicates) qs.set("include_duplicates", "true");
   const query = qs.toString();
   return fetchJson(`/api/v1/alerts${query ? `?${query}` : ""}`);
 }
@@ -100,12 +102,36 @@ export async function setLlmModel(
 
 export async function generateAgentAlert(
   hint?: string
-): Promise<{ alert: import("./types").AlertIngest; ingest: import("./types").AlertIngestResponse }> {
+): Promise<{
+  alert: import("./types").AlertIngest;
+  ingest: import("./types").AlertIngestResponse;
+  snapshot: import("./types").StreamSnapshot;
+}> {
   return fetchJson("/api/v1/agents/generate-alert", {
     method: "POST",
     headers: { "X-API-Key": API_KEY },
     body: JSON.stringify({ hint: hint ?? null }),
   });
+}
+
+export async function agentGeneratorChat(
+  message: string
+): Promise<import("./types").ChatResponse> {
+  return fetchJson("/api/v1/agents/chat", {
+    method: "POST",
+    headers: { "X-API-Key": API_KEY },
+    body: JSON.stringify({ message }),
+  });
+}
+
+export const ALERT_STREAM_SNAPSHOT_EVENT = "alert-stream-snapshot";
+
+export function dispatchAlertSnapshot(snapshot: import("./types").StreamSnapshot) {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(ALERT_STREAM_SNAPSHOT_EVENT, { detail: snapshot })
+    );
+  }
 }
 
 export async function agentAutoStream(

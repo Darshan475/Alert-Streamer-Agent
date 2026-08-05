@@ -90,6 +90,20 @@ export interface PipelineStats {
   by_team: Record<string, number>;
 }
 
+export interface StreamSnapshot {
+  type: "snapshot";
+  alerts: AlertListResponse;
+  stats: PipelineStats;
+}
+
+export interface ChatResponse {
+  reply: string;
+  blocked: boolean;
+  results: AlertIngestResponse[];
+  alerts: AlertIngest[];
+  snapshot: StreamSnapshot;
+}
+
 export type LlmProviderId = "gemini" | "openrouter" | "groq" | "huggingface" | "nvidia" | "offline";
 
 export interface LlmProviderInfo {

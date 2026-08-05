@@ -127,3 +127,42 @@ class PipelineStats(BaseModel):
     by_status: dict[str, int]
     by_priority: dict[str, int]
     by_team: dict[str, int]
+
+
+class StreamSnapshot(BaseModel):
+    type: str = "snapshot"
+    alerts: AlertListResponse
+    stats: PipelineStats
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    blocked: bool = False
+    results: list[AlertIngestResponse] = Field(default_factory=list)
+    alerts: list[AlertIngest] = Field(default_factory=list)
+    snapshot: StreamSnapshot
+
+
+class GenerateAlertRequest(BaseModel):
+    hint: str | None = Field(None, max_length=500)
+
+
+class GenerateAlertResponse(BaseModel):
+    alert: AlertIngest
+    ingest: AlertIngestResponse
+    snapshot: StreamSnapshot
+
+
+class AutoStreamRequest(BaseModel):
+    count: int = Field(5, ge=1, le=20)
+    hint: str | None = None
+
+
+class AutoStreamResponse(BaseModel):
+    generated: int
+    results: list[AlertIngestResponse]
+    snapshot: StreamSnapshot

@@ -7,6 +7,7 @@ export function isPrioritized(alert: AlertRecord): boolean {
 }
 
 export function filterAlerts(alerts: AlertRecord[], filter: FilterId): AlertRecord[] {
+  if (filter === "duplicate") return alerts.filter((a) => a.status === "duplicate");
   const visible = alerts.filter((a) => a.status !== "duplicate");
   if (filter === "all") return visible;
   if (filter === "prioritized") return visible.filter(isPrioritized);
@@ -20,5 +21,6 @@ export function computeFilterCounts(alerts: AlertRecord[]): Record<string, numbe
     prioritized: visible.filter(isPrioritized).length,
     rejected: visible.filter((a) => a.status === "rejected").length,
     resolved: visible.filter((a) => a.status === "resolved").length,
+    duplicate: alerts.filter((a) => a.status === "duplicate").length,
   };
 }

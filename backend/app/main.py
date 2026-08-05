@@ -15,6 +15,7 @@ from app.config import DEFAULT_LLM_PROVIDER, DEFAULT_OPENROUTER_MODEL, get_setti
 from app.services.alert_generator_agent import AlertGeneratorAgent
 from app.services.alert_pipeline import AlertPipeline, DedupStore
 from app.services.alert_store import AlertStore
+from app.services.generator_chat_agent import GeneratorChatAgent
 from app.services.ingest_agent import IngestAgent
 from app.services.llm_client import LLMClient
 from app.services.pipeline_agent import PipelineAgent
@@ -37,6 +38,7 @@ pipeline_agent = PipelineAgent(llm_client)
 ingest_agent = IngestAgent(llm_client)
 alert_pipeline = AlertPipeline(dedup_store, pipeline_agent=pipeline_agent, ingest_agent=ingest_agent)
 alert_generator = AlertGeneratorAgent(llm_client)
+generator_chat_agent = GeneratorChatAgent(llm_client, alert_generator, alert_pipeline)
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -60,7 +62,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Alert Streamer",
     description="Agent-driven alert pipeline — ingest, validate, deduplicate, prioritize",
-    version="2.6.3",
+    version="2.7.0",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
@@ -88,7 +90,7 @@ async def health():
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
         "pipeline": "ingest → validate → deduplicate → prioritize",
-        "agents": ["ingest", "pipeline", "generator", "websocket"],
+        "agents": ["ingest", "pipeline", "generator", "generator-chat", "websocket"],
     }
 
 

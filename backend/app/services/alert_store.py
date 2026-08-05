@@ -107,8 +107,10 @@ class AlertStore:
         by_priority: dict[str, int] = {}
         by_team: dict[str, int] = {}
 
-        for alert in active:
+        for alert in self._alerts.values():
             by_status[alert.status.value] = by_status.get(alert.status.value, 0) + 1
+
+        for alert in active:
             by_priority[f"P{alert.priority}"] = by_priority.get(f"P{alert.priority}", 0) + 1
             by_team[alert.team.value] = by_team.get(alert.team.value, 0) + 1
 

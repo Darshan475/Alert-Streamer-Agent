@@ -7,6 +7,7 @@ const FILTERS: { id: FilterId; label: string }[] = [
   { id: "prioritized", label: "Prioritized" },
   { id: "rejected", label: "Rejected" },
   { id: "resolved", label: "Resolved" },
+  { id: "duplicate", label: "Duplicates" },
 ];
 
 interface Props {

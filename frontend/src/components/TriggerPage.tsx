@@ -5,20 +5,28 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { generateAgentAlert, getHealth, getStats } from "@/lib/api";
+import { agentGeneratorChat, dispatchAlertSnapshot, generateAgentAlert, getHealth, getStats } from "@/lib/api";
 import type { AlertIngest, AlertIngestResponse } from "@/lib/types";
 import {
   Activity,
   Bot,
   CheckCircle2,
   Loader2,
+  MessageSquare,
   Play,
+  Send,
   Sparkles,
   Square,
   XCircle,
   ArrowRight,
   Radio,
 } from "lucide-react";
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+}
 
 interface StreamEvent {
   id: string;
@@ -53,8 +61,18 @@ export function TriggerPage() {
   const [duplicates, setDuplicates] = useState(0);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      text: "Ask for custom alert data — e.g. \"provide 2 duplicate alerts\", \"create rejected data\", or \"show resolved alerts\".",
+    },
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
   const stopRef = useRef(false);
   const logRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getHealth()
@@ -65,6 +83,10 @@ export function TriggerPage() {
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [events]);
+
+  useEffect(() => {
+    if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [chatMessages]);
 
   const pushEvent = useCallback(
     (alert: AlertIngest, result: AlertIngestResponse | null, err?: string) => {
@@ -97,12 +119,20 @@ export function TriggerPage() {
     []
   );
 
+  const syncSnapshot = useCallback(
+    (snapshot: import("@/lib/types").StreamSnapshot) => {
+      dispatchAlertSnapshot(snapshot);
+    },
+    []
+  );
+
   const generateAndIngest = useCallback(async () => {
       setGenerating(true);
       try {
         const res = await generateAgentAlert();
         setGenerated((prev) => [res.alert, ...prev].slice(0, 12));
         pushEvent(res.alert, res.ingest);
+        syncSnapshot(res.snapshot);
         return res;
       } catch (err) {
         const message = err instanceof Error ? err.message : "Agent generation failed";
@@ -125,8 +155,42 @@ export function TriggerPage() {
         setGenerating(false);
       }
     },
-    [pushEvent]
+    [pushEvent, syncSnapshot]
   );
+
+  const sendChat = useCallback(async () => {
+    const text = chatInput.trim();
+    if (!text || chatLoading || backendOk === false) return;
+
+    setChatInput("");
+    setChatMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text }]);
+    setChatLoading(true);
+
+    try {
+      const res = await agentGeneratorChat(text);
+      setChatMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role: "assistant", text: res.reply },
+      ]);
+      syncSnapshot(res.snapshot);
+
+      if (res.alerts.length > 0) {
+        setGenerated((prev) => [...res.alerts, ...prev].slice(0, 12));
+        res.alerts.forEach((alert, i) => {
+          pushEvent(alert, res.results[i] ?? null);
+        });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Chat request failed";
+      setChatMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role: "assistant", text: message },
+      ]);
+      setToast({ message, type: "error" });
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatInput, chatLoading, backendOk, pushEvent, syncSnapshot]);
 
   const autoStream = useCallback(async () => {
     if (streaming || backendOk === false) return;
@@ -244,6 +308,58 @@ export function TriggerPage() {
                     </button>
                   )}
               </div>
+            </div>
+
+            <div className="shrink-0 rounded-xl border border-slate-700/70 bg-slate-900/40 flex flex-col min-h-[140px] max-h-[180px]">
+              <div className="shrink-0 px-3 py-1.5 border-b border-slate-800 flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide">
+                <MessageSquare className="h-3 w-3 text-violet-400" />
+                Generator Chat
+              </div>
+              <div ref={chatRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2 space-y-2 text-xs scroll-panel">
+                {chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`rounded-lg px-2.5 py-1.5 whitespace-pre-wrap ${
+                      msg.role === "user"
+                        ? "ml-6 bg-violet-500/15 text-violet-100"
+                        : "mr-4 bg-slate-800/80 text-slate-300"
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                ))}
+                {chatLoading && (
+                  <div className="flex items-center gap-2 text-slate-500 px-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Processing…
+                  </div>
+                )}
+              </div>
+              <form
+                className="shrink-0 flex gap-2 p-2 border-t border-slate-800"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void sendChat();
+                }}
+              >
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  disabled={chatLoading || backendOk === false}
+                  placeholder="e.g. provide 2 duplicate alerts"
+                  maxLength={500}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/50"
+                />
+                <button
+                  type="submit"
+                  disabled={chatLoading || !chatInput.trim() || backendOk === false}
+                  className="shrink-0 rounded-lg border border-violet-500/40 bg-violet-500/10 px-2.5 py-1.5 text-violet-300 hover:bg-violet-500/20 disabled:opacity-40"
+                  aria-label="Send chat message"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </button>
+              </form>
             </div>
 
             <div className="flex flex-col flex-1 min-h-0 gap-2">

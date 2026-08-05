@@ -38,24 +38,22 @@ class StreamHub:
             self._connections.discard(ws)
 
     @staticmethod
-    async def send_snapshot(websocket: WebSocket, store: "AlertStore") -> None:
-        from app.models.schemas import AlertStatus
-
-        items, total = await store.list_alerts(
-            limit=100,
-            exclude_statuses={AlertStatus.DUPLICATE},
-        )
+    async def build_snapshot(store: "AlertStore") -> dict:
+        items, total = await store.list_alerts(limit=100)
         stats = await store.stats()
-        await websocket.send_json(
-            {
-                "type": "snapshot",
-                "alerts": {
-                    "total": total,
-                    "items": [a.model_dump(mode="json") for a in items],
-                },
-                "stats": stats.model_dump(mode="json"),
-            }
-        )
+        return {
+            "type": "snapshot",
+            "alerts": {
+                "total": total,
+                "items": [a.model_dump(mode="json") for a in items],
+            },
+            "stats": stats.model_dump(mode="json"),
+        }
+
+    @staticmethod
+    async def send_snapshot(websocket: WebSocket, store: "AlertStore") -> None:
+        payload = await StreamHub.build_snapshot(store)
+        await websocket.send_json(payload)
 
 
 stream_hub = StreamHub()
