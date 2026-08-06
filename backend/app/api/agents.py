@@ -5,8 +5,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app.api.alerts import get_pipeline, get_store
 from app.api.security import verify_api_key
 from app.models.schemas import (
+    AlertCategory,
     AlertIngest,
     AlertIngestResponse,
+    AlertRecord,
+    AlertStatus,
     AutoStreamRequest,
     AutoStreamResponse,
     ChatRequest,
@@ -14,8 +17,11 @@ from app.models.schemas import (
     GenerateAlertRequest,
     GenerateAlertResponse,
     StreamSnapshot,
+    Team,
 )
 from app.services.alert_generator_agent import AlertGeneratorAgent
+from app.services.alert_pipeline import build_alert_record, compute_fingerprint
+from app.services.alert_store import AlertStore
 from app.services.generator_chat_agent import GeneratorChatAgent, build_snapshot
 from app.services.llm_client import LLMError
 
@@ -39,6 +45,44 @@ async def _snapshot_response(store) -> StreamSnapshot:
     return StreamSnapshot.model_validate(raw)
 
 
+async def _persist_pipeline_outcome(
+    alert: AlertIngest,
+    response: AlertIngestResponse,
+    record: AlertRecord | None,
+    store: AlertStore,
+) -> AlertRecord | None:
+    """Save every pipeline outcome so Monitor Pipeline reflects all generated events."""
+    if response.accepted and record:
+        return await store.save(record)
+
+    fingerprint = compute_fingerprint(alert)
+    extra: dict = {}
+    stage_log: list[dict]
+
+    if response.status == AlertStatus.DUPLICATE:
+        stage_log = [{"stage": "deduplicate", "reasoning": response.message or "Duplicate suppressed"}]
+        if response.duplicate_of:
+            extra["duplicate_of"] = str(response.duplicate_of)
+        status = AlertStatus.DUPLICATE
+    elif response.status == AlertStatus.REJECTED:
+        stage_log = [{"stage": "validate", "reasoning": response.message or "Rejected by pipeline"}]
+        status = AlertStatus.REJECTED
+    else:
+        return None
+
+    stored = build_alert_record(
+        alert,
+        fingerprint,
+        AlertCategory.API,
+        Team.BACKEND,
+        3,
+        status=status,
+        stage_log=stage_log,
+        extra_metadata=extra or None,
+    )
+    return await store.save(stored)
+
+
 @router.post("/generate-alert", response_model=GenerateAlertResponse)
 async def generate_alert(
     body: GenerateAlertRequest,
@@ -56,8 +100,7 @@ async def generate_alert(
             recent_titles=[a.title for a in recent_items],
         )
         response, record = await pipeline.process(alert, store=store)
-        if response.accepted and record:
-            await store.save(record)
+        await _persist_pipeline_outcome(alert, response, record, store)
         snapshot = await _snapshot_response(store)
         return GenerateAlertResponse(alert=alert, ingest=response, snapshot=snapshot)
     except LLMError as exc:
@@ -107,14 +150,19 @@ async def auto_stream(
     recent_titles: list[str] = []
 
     try:
-        for _ in range(body.count):
-            alert = await generator.generate(hint=body.hint, recent_titles=recent_titles)
+        for i in range(body.count):
+            stream_hint = (
+                f"{body.hint} (unique stream item {i + 1}/{body.count})"
+                if body.hint
+                else f"Generate a unique PSS BWS P3 Datadog alert — stream item {i + 1} of {body.count}"
+            )
+            alert = await generator.generate(hint=stream_hint, recent_titles=recent_titles)
             response, record = await pipeline.process(alert, store=store)
             results.append(response)
             alerts.append(alert)
-            if response.accepted and record:
-                await store.save(record)
-                recent_titles.append(record.title)
+            saved = await _persist_pipeline_outcome(alert, response, record, store)
+            if saved:
+                recent_titles.append(saved.title)
     except (LLMError, RuntimeError) as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except ValueError as exc:

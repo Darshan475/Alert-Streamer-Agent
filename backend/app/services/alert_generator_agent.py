@@ -142,34 +142,43 @@ class AlertGeneratorAgent:
 
     def _template_fallback(self, recent_titles: list[str] | None) -> AlertIngest:
         """Deterministic PSS BWS alert when LLM is unavailable."""
-        use_warn = random.choice([True, False])
-        title = self.TEMPLATE_WARN if use_warn else self.TEMPLATE_TRIGGERED
-        if title in (recent_titles or []):
-            title = self.TEMPLATE_TRIGGERED if use_warn else self.TEMPLATE_WARN
-
         now = datetime.now(UTC)
         incident_id = str(random.randint(850000, 899999))
-        service = (
-            f"digitalpromosmiscservices-{incident_id[-3]}-prd"
-            if not use_warn
-            else f"propertyupdate-{incident_id[-3]}"
-        )
+        unique = now.strftime("%H%M%S%f")
+        use_warn = random.choice([True, False])
+
+        if use_warn:
+            title = f"Warn: [P3][PSS BWS]LOW SQS MESSAGE VOLUME DETECTED_propertyupdate-{unique}"
+            alert_type = "sqs_volume"
+            service = f"propertyupdate-{incident_id}-prd"
+            description = "PSS BWS monitoring alert — low SQS message volume detected on property update queue."
+            metric_value, threshold = 3.0, 10.0
+            alert_kind = "Warn"
+        else:
+            title = (
+                f"Triggered: [P3][PSS BWS] /loyalty/v4/member/{unique} "
+                f"5xx error rate- Prod - Tally dservices-{incident_id}-prd"
+            )
+            alert_type = "api_5xx"
+            service = f"digitalpromosmiscservices-{incident_id}-prd"
+            description = "PSS BWS API 5xx error rate exceeded threshold on loyalty promotion register token endpoint."
+            metric_value, threshold = 22.0, 5.0
+            alert_kind = "Triggered"
+
+        if title in (recent_titles or []):
+            title = f"{title} [{unique}]"
 
         return mask_ingest(
             AlertIngest(
             source="datadog",
-            alert_type="sqs_volume" if use_warn else "api_5xx",
+            alert_type=alert_type,
             title=title,
-            description=(
-                "PSS BWS monitoring alert — low SQS message volume detected on property update queue."
-                if use_warn
-                else "PSS BWS API 5xx error rate exceeded threshold on loyalty promotion register token endpoint."
-            ),
+            description=description,
             severity=AlertSeverity.MEDIUM,
             service=service,
             environment="production",
-            metric_value=22.0 if not use_warn else 3.0,
-            threshold=5.0 if not use_warn else 10.0,
+            metric_value=metric_value,
+            threshold=threshold,
             namespace="pss-bws",
             region="us-east-1",
             tags=["pss-bws", "p3", "datadog", "prod"],
@@ -180,7 +189,7 @@ class AlertGeneratorAgent:
                 "priority_tier": "P3",
                 "platform": "Pss Bws",
                 "monitor": "Datadog",
-                "alert_kind": "Warn" if use_warn else "Triggered",
+                "alert_kind": alert_kind,
                 "generated_by": "alert_generator_agent",
                 "fallback": True,
             },

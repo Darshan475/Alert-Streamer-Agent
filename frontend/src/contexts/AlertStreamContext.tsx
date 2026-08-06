@@ -73,12 +73,13 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
   const applySnapshot = useCallback((snapshot: StreamSnapshot) => {
     if (snapshot.type !== "snapshot") return;
     setAlerts((prev) => {
-      const merged = mergeSnapshots(
-        prev.length > 0
-          ? { type: "snapshot", alerts: { total: prev.length, items: prev }, stats: snapshot.stats }
-          : loadAlertSnapshot(),
-        snapshot
-      );
+      const cached = loadAlertSnapshot();
+      const base = mergeSnapshots(cached, {
+        type: "snapshot",
+        alerts: { total: prev.length, items: prev },
+        stats: snapshot.stats,
+      });
+      const merged = mergeSnapshots(base, snapshot);
       setStats(merged.stats);
       saveAlertSnapshot(merged);
       return merged.alerts.items;
@@ -111,18 +112,17 @@ export function AlertStreamProvider({ children }: { children: ReactNode }) {
     Promise.all([getAlerts({ limit: 100, include_duplicates: true }), getStats()])
       .then(([list, nextStats]) => {
         if (!mountedRef.current) return;
-        const cached = loadAlertSnapshot();
         const apiSnapshot: StreamSnapshot = {
           type: "snapshot",
           alerts: { total: list.total, items: list.items },
           stats: nextStats,
         };
-        replaceSnapshot(mergeSnapshots(cached, apiSnapshot));
+        applySnapshot(apiSnapshot);
       })
       .catch(() => {
         /* WebSocket will retry */
       });
-  }, [replaceSnapshot]);
+  }, [applySnapshot]);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;

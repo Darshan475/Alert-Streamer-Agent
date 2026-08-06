@@ -253,6 +253,15 @@ export function TriggerPage() {
       const res = await agentAutoStream(streamCount);
       syncSnapshot(res.snapshot);
 
+      const accepted = res.results.filter((r) => r.accepted).length;
+      const duplicates = res.results.filter((r) => r.status === "duplicate").length;
+      const rejected = res.results.filter((r) => r.status === "rejected").length;
+      const stored = res.snapshot.alerts.items.length;
+      setToast({
+        message: `${stored} alert(s) synced to Monitor Pipeline (${accepted} prioritized, ${duplicates} duplicate, ${rejected} rejected).`,
+        type: "success",
+      });
+
       setGenerated((prev) => [...res.alerts.map(maskIngestForDisplay), ...prev].slice(0, 12));
       res.alerts.forEach((alert, i) => {
         pushEvent(maskIngestForDisplay(alert), res.results[i] ?? null);
