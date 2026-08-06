@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { AlertList } from "@/components/AlertList";
 import { AlertDetailFullscreenModal } from "@/components/AlertDetailFullscreenModal";
 import { AppShell } from "@/components/AppShell";
@@ -9,9 +10,11 @@ import { StatsCards } from "@/components/StatsCards";
 import { Pagination } from "@/components/Pagination";
 import { StatusFilterTabs } from "@/components/StatusFilterTabs";
 import { Toast } from "@/components/Toast";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAlertStream } from "@/hooks/useAlertStream";
 import { useHealth } from "@/hooks/useAlerts";
 import { computeFilterCounts, filterAlerts, searchAlerts, type FilterId } from "@/lib/alertFilters";
+import { loadAlertSnapshot } from "@/lib/alertSnapshotCache";
 import { ExternalLink, Loader2, Search, Trash2 } from "lucide-react";
 
 const PAGE_SIZE = 8;
@@ -22,10 +25,19 @@ export function AlertsPage() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [clearing, setClearing] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
-  const { alerts, stats, connected, error, isLoading, reconnect, clearAll } = useAlertStream();
+  const { alerts, stats, connected, error, isLoading, reconnect, clearAll, applySnapshot } =
+    useAlertStream();
   const { mutate: mutateHealth } = useHealth();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname !== "/alerts") return;
+    const cached = loadAlertSnapshot();
+    if (cached) applySnapshot(cached);
+  }, [pathname, applySnapshot]);
 
   const silentRefresh = useCallback(() => {
     reconnect();
@@ -62,11 +74,11 @@ export function AlertsPage() {
 
   const handleClearPipeline = useCallback(async () => {
     if (clearing) return;
-    if (!window.confirm("Clear all alerts from the pipeline store?")) return;
     setClearing(true);
     try {
       await clearAll();
       setSelectedId(null);
+      setShowClearConfirm(false);
       setToast({ message: "Pipeline cleared.", type: "success" });
     } catch (err) {
       setToast({
@@ -126,7 +138,7 @@ export function AlertsPage() {
             </div>
             <button
               type="button"
-              onClick={() => void handleClearPipeline()}
+              onClick={() => setShowClearConfirm(true)}
               disabled={clearing || alerts.length === 0}
               className="flex items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-xs text-red-300 hover:bg-red-500/20 disabled:opacity-40 shrink-0"
             >
@@ -174,6 +186,23 @@ export function AlertsPage() {
       {toast && (
         <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
       )}
+
+      <ConfirmDialog
+        open={showClearConfirm}
+        onOpenChange={setShowClearConfirm}
+        title="Clear pipeline?"
+        description="This permanently removes all alerts from the pipeline store. Active filters and search will reset. This cannot be undone."
+        confirmLabel="Clear pipeline"
+        variant="danger"
+        loading={clearing}
+        onConfirm={handleClearPipeline}
+        details={
+          <span>
+            <span className="font-medium text-red-300">{alerts.length}</span> alert
+            {alerts.length === 1 ? "" : "s"} will be removed from Monitor Pipeline.
+          </span>
+        }
+      />
     </AppShell>
   );
 }

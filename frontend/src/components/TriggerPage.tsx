@@ -5,7 +5,9 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Toast } from "@/components/Toast";
-import { agentAutoStream, agentGeneratorChat, dispatchAlertSnapshot, generateAgentAlert, getHealth } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useAlertStream } from "@/hooks/useAlertStream";
+import { agentAutoStream, agentGeneratorChat, generateAgentAlert, getHealth } from "@/lib/api";
 import { maskIngestForDisplay } from "@/lib/maskDisplay";
 import {
   clearTriggerSession,
@@ -62,6 +64,7 @@ function alertRowMeta(alert: AlertIngest) {
 }
 
 export function TriggerPage() {
+  const { applySnapshot } = useAlertStream();
   const [generated, setGenerated] = useState<AlertIngest[]>([]);
   const [events, setEvents] = useState<StreamEvent[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -74,6 +77,7 @@ export function TriggerPage() {
   const [duplicates, setDuplicates] = useState(0);
   const [backendOk, setBackendOk] = useState<boolean | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showClearLocalConfirm, setShowClearLocalConfirm] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -162,9 +166,9 @@ export function TriggerPage() {
 
   const syncSnapshot = useCallback(
     (snapshot: import("@/lib/types").StreamSnapshot) => {
-      dispatchAlertSnapshot(snapshot);
+      applySnapshot(snapshot);
     },
-    []
+    [applySnapshot],
   );
 
   const generateAndIngest = useCallback(async () => {
@@ -270,6 +274,7 @@ export function TriggerPage() {
     setDuplicates(0);
     setChatMessages([]);
     clearTriggerSession();
+    setShowClearLocalConfirm(false);
     setToast({ message: "Trigger preview and stream log cleared.", type: "success" });
   }, []);
 
@@ -439,7 +444,7 @@ export function TriggerPage() {
                 </h2>
                 <button
                   type="button"
-                  onClick={clearLocal}
+                  onClick={() => setShowClearLocalConfirm(true)}
                   disabled={generated.length === 0 && events.length === 0}
                   className="flex items-center gap-1 rounded-lg border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-red-300 hover:border-red-500/40 disabled:opacity-40"
                 >
@@ -519,6 +524,24 @@ export function TriggerPage() {
       {toast && (
         <Toast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
       )}
+
+      <ConfirmDialog
+        open={showClearLocalConfirm}
+        onOpenChange={setShowClearLocalConfirm}
+        title="Clear local session?"
+        description="This removes generated previews, stream log entries, and chat history from this browser session. Alerts already synced to Monitor Pipeline are not affected."
+        confirmLabel="Clear local data"
+        variant="danger"
+        onConfirm={clearLocal}
+        details={
+          <span>
+            <span className="font-medium text-red-300">{generated.length}</span> preview
+            {generated.length === 1 ? "" : "s"} and{" "}
+            <span className="font-medium text-red-300">{events.length}</span> log entr
+            {events.length === 1 ? "y" : "ies"} will be removed.
+          </span>
+        }
+      />
     </AppShell>
   );
 }

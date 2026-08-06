@@ -1,6 +1,6 @@
 import type { AlertRecord, PipelineStats, StreamSnapshot } from "./types";
 
-const SNAPSHOT_KEY = "alert-streamer-snapshot";
+export const SNAPSHOT_KEY = "alert-streamer-snapshot";
 
 export function computeStatsFromAlerts(items: AlertRecord[]): PipelineStats {
   const active = items.filter((a) => a.status !== "duplicate");
