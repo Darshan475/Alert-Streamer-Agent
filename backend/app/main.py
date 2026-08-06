@@ -97,6 +97,8 @@ async def health():
     return {
         "status": "healthy",
         "service": "alert-streamer",
+        "version": app.version,
+        "build": "3a14038",
         "llm_configured": llm_client.is_configured,
         "llm_provider": llm_client.provider,
         "model": llm_client.model,
