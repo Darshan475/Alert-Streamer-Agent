@@ -266,7 +266,16 @@ class PipelineAgent:
         except ValueError:
             return Team.SRE
 
-    async def run(self, alert: AlertIngest, open_alerts: list[dict] | None = None) -> PipelineAgentResult:
+    async def run(
+        self,
+        alert: AlertIngest,
+        open_alerts: list[dict] | None = None,
+        *,
+        skip_dedup: bool = False,
+    ) -> PipelineAgentResult:
+        if skip_dedup:
+            return await self._run_generation_path(alert)
+
         initial: PipelineState = {
             "alert": alert.model_dump(mode="json"),
             "open_alerts": open_alerts or [],
@@ -315,4 +324,43 @@ class PipelineAgent:
             priority=final.get("priority", 3),
             stage_log=log,
             enriched_metadata=final.get("enriched") or {},
+        )
+
+    async def _run_generation_path(self, alert: AlertIngest) -> PipelineAgentResult:
+        """Validate → prioritize only (skip dedup for agent-generated unique alerts)."""
+        alert_dict = alert.model_dump(mode="json")
+        log: list[dict] = []
+
+        validate = await self._call_stage("validate", alert_dict)
+        log.append({"stage": "validate", **{k: v for k, v in validate.items() if k != "stage"}})
+        if not validate.get("valid", True):
+            return PipelineAgentResult(
+                accepted=False,
+                rejected=True,
+                duplicate=False,
+                reject_message=validate.get("reject_reason") or "Validation agent rejected alert",
+                stage_log=log,
+            )
+
+        log.append(
+            {
+                "stage": "deduplicate",
+                "is_duplicate": False,
+                "reasoning": "Dedup skipped — agent-generated unique alert",
+            }
+        )
+
+        prioritize = await self._call_stage("prioritize", alert_dict)
+        log.append({"stage": "prioritize", **{k: v for k, v in prioritize.items() if k != "stage"}})
+        priority = min(5, max(1, int(prioritize.get("priority", 3))))
+
+        return PipelineAgentResult(
+            accepted=True,
+            rejected=False,
+            duplicate=False,
+            category=self._parse_category(prioritize.get("category", "other")),
+            team=self._parse_team(prioritize.get("team", "sre")),
+            priority=priority,
+            stage_log=log,
+            enriched_metadata=validate.get("enriched_fields") or {},
         )

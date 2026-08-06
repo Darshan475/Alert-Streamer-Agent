@@ -256,10 +256,14 @@ export function TriggerPage() {
       const accepted = res.results.filter((r) => r.accepted).length;
       const duplicates = res.results.filter((r) => r.status === "duplicate").length;
       const rejected = res.results.filter((r) => r.status === "rejected").length;
-      const stored = res.snapshot.alerts.items.length;
       setToast({
-        message: `${stored} alert(s) synced to Monitor Pipeline (${accepted} prioritized, ${duplicates} duplicate, ${rejected} rejected).`,
-        type: "success",
+        message:
+          accepted > 0
+            ? `${accepted} prioritized alert(s) synced to Monitor Pipeline.`
+            : duplicates > 0
+              ? `${duplicates} duplicate(s) only — try Clear pipeline first, then Auto Stream again.`
+              : `${rejected} rejected — check backend LLM configuration.`,
+        type: accepted > 0 ? "success" : "error",
       });
 
       setGenerated((prev) => [...res.alerts.map(maskIngestForDisplay), ...prev].slice(0, 12));

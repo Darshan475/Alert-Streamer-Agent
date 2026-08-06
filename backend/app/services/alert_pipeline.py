@@ -38,6 +38,36 @@ def compute_fingerprint(alert: AlertIngest) -> str:
     return hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()
 
 
+def ensure_unique_ingest(alert: AlertIngest, *, salt: str | None = None) -> AlertIngest:
+    """Force a unique fingerprint for agent-generated demo alerts."""
+    import random
+
+    now = datetime.now(UTC)
+    meta = dict(alert.metadata or {})
+    incident_id = str(meta.get("incident_id") or random.randint(850000, 899999))
+    token = salt or f"{now.strftime('%H%M%S%f')}{random.randint(100, 999)}"
+    meta["incident_id"] = incident_id
+    meta["generation_token"] = token
+
+    service = alert.service or "pss-bws"
+    if incident_id not in service:
+        stem = service[:-4] if service.endswith("-prd") else service
+        service = f"{stem}-{incident_id}-prd"
+
+    title = alert.title
+    if token[:8] not in title:
+        title = f"{title} [{token[:8]}]"
+
+    return alert.model_copy(
+        update={
+            "service": service[:128],
+            "title": title[:512],
+            "metadata": meta,
+            "timestamp": now,
+        }
+    )
+
+
 def build_alert_record(
     alert: AlertIngest,
     fingerprint: str,
@@ -120,6 +150,7 @@ class AlertPipeline:
         *,
         store: "AlertStore | None" = None,
         ingest_stage: dict | None = None,
+        skip_dedup: bool = False,
     ) -> tuple[AlertIngestResponse, AlertRecord | None]:
         try:
             alert = AlertIngest.model_validate(alert.model_dump())
@@ -134,7 +165,7 @@ class AlertPipeline:
             )
 
         fingerprint = compute_fingerprint(alert)
-        existing_id = await self._dedup.get(fingerprint)
+        existing_id = None if skip_dedup else await self._dedup.get(fingerprint)
 
         if existing_id and store is not None:
             try:
@@ -146,7 +177,7 @@ class AlertPipeline:
                 existing_id = None
 
         open_alerts: list[dict] = []
-        if store is not None:
+        if store is not None and not skip_dedup:
             items, _ = await store.list_alerts(limit=20, exclude_statuses={AlertStatus.DUPLICATE})
             open_alerts = [
                 {
@@ -171,7 +202,7 @@ class AlertPipeline:
                 None,
             )
 
-        result = await self._agent.run(alert, open_alerts)
+        result = await self._agent.run(alert, open_alerts, skip_dedup=skip_dedup)
 
         if result.rejected:
             return (
@@ -183,7 +214,7 @@ class AlertPipeline:
                 None,
             )
 
-        if result.duplicate or existing_id:
+        if not skip_dedup and (result.duplicate or existing_id):
             dup = result.duplicate_of_id or existing_id
             return (
                 AlertIngestResponse(
@@ -217,6 +248,44 @@ class AlertPipeline:
             ),
             record,
         )
+
+
+async def persist_pipeline_outcome(
+    alert: AlertIngest,
+    response: AlertIngestResponse,
+    record: AlertRecord | None,
+    store: "AlertStore",
+) -> AlertRecord | None:
+    """Save every pipeline outcome so Monitor Pipeline reflects all generated events."""
+    if response.accepted and record:
+        return await store.save(record)
+
+    fingerprint = compute_fingerprint(alert)
+    extra: dict = {}
+    stage_log: list[dict]
+
+    if response.status == AlertStatus.DUPLICATE:
+        stage_log = [{"stage": "deduplicate", "reasoning": response.message or "Duplicate suppressed"}]
+        if response.duplicate_of:
+            extra["duplicate_of"] = str(response.duplicate_of)
+        status = AlertStatus.DUPLICATE
+    elif response.status == AlertStatus.REJECTED:
+        stage_log = [{"stage": "validate", "reasoning": response.message or "Rejected by pipeline"}]
+        status = AlertStatus.REJECTED
+    else:
+        return None
+
+    stored = build_alert_record(
+        alert,
+        fingerprint,
+        AlertCategory.API,
+        Team.BACKEND,
+        3,
+        status=status,
+        stage_log=stage_log,
+        extra_metadata=extra or None,
+    )
+    return await store.save(stored)
 
 
 class DedupStore:

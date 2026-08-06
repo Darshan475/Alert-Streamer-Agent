@@ -5,6 +5,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from uuid import uuid4
 
 from app.models.schemas import (
     AlertCategory,
@@ -15,7 +16,13 @@ from app.models.schemas import (
     Team,
 )
 from app.services.alert_generator_agent import AlertGeneratorAgent
-from app.services.alert_pipeline import AlertPipeline, build_alert_record, compute_fingerprint
+from app.services.alert_pipeline import (
+    AlertPipeline,
+    build_alert_record,
+    compute_fingerprint,
+    ensure_unique_ingest,
+    persist_pipeline_outcome,
+)
 from app.services.alert_store import AlertStore
 from app.services.guardrails import GuardrailResult, sanitize_message
 from app.services.llm_client import LLMClient
@@ -48,7 +55,7 @@ INTENT_KEYWORDS: dict[str, tuple[str, ...]] = {
     "duplicate": ("duplicate", "dupe", "dup data"),
     "rejected": ("reject", "rejected", "failed validation", "invalid"),
     "resolved": ("resolved", "closed", "fixed", "cleared"),
-    "prioritized": ("priorit", "generate", "create", "new alert", "normal"),
+    "prioritized": ("priorit", "generate", "create", "new alert", "normal", "non duplicate", "non-duplicate", "not duplicate", "unique", "fresh"),
     "help": ("help", "what can you", "how do"),
 }
 
@@ -103,16 +110,19 @@ class GeneratorChatAgent:
         alerts: list[AlertIngest] = []
         records: list[AlertRecord] = []
 
-        for _ in range(count):
+        for i in range(count):
             if intent == "prioritized":
-                alert = await self._generator.generate(recent_titles=recent_titles)
-                response, record = await self._pipeline.process(alert, store=store)
+                raw = await self._generator.generate(recent_titles=recent_titles)
+                alert = ensure_unique_ingest(raw, salt=f"chat-{i}-{uuid4().hex[:6]}")
+                response, record = await self._pipeline.process(
+                    alert, store=store, skip_dedup=True
+                )
                 results.append(response)
                 alerts.append(alert)
-                if response.accepted and record:
-                    await store.save(record)
-                    records.append(record)
-                    recent_titles.append(record.title)
+                saved = await persist_pipeline_outcome(alert, response, record, store)
+                if saved:
+                    records.append(saved)
+                    recent_titles.append(saved.title)
             elif intent == "duplicate":
                 alert, record, response = await self._create_duplicate(
                     store, recent_titles
