@@ -59,6 +59,17 @@ export function AlertsPage() {
     return searchedAlerts.slice(start, start + PAGE_SIZE);
   }, [searchedAlerts, page]);
 
+  const emptyHint = useMemo(() => {
+    if (searchedAlerts.length > 0) return undefined;
+    if (statusFilter === "all" && filterCounts.duplicate > 0 && filterCounts.all === 0) {
+      return `${filterCounts.duplicate} duplicate alert(s) in pipeline — open the Duplicates tab, or Clear and regenerate prioritized alerts from Trigger Events.`;
+    }
+    if (statusFilter === "all" && filterCounts.duplicate > 0) {
+      return `${filterCounts.duplicate} duplicate(s) are hidden on All — use the Duplicates tab.`;
+    }
+    return undefined;
+  }, [searchedAlerts.length, statusFilter, filterCounts]);
+
   const selectedAlert = useMemo(
     () => alerts.find((a) => a.id === selectedId) ?? null,
     [alerts, selectedId]
@@ -159,6 +170,7 @@ export function AlertsPage() {
               alerts={paginatedAlerts}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              emptyHint={emptyHint}
             />
           </div>
 

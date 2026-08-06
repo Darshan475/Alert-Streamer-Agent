@@ -220,6 +220,20 @@ export function TriggerPage() {
       ]);
       syncSnapshot(res.snapshot);
 
+      const accepted = res.results.filter((r) => r.accepted).length;
+      const duplicates = res.results.filter((r) => r.status === "duplicate").length;
+      if (accepted > 0) {
+        setToast({
+          message: `${accepted} prioritized alert(s) synced to Monitor Pipeline.`,
+          type: "success",
+        });
+      } else if (duplicates > 0 && /non[- ]?duplicate|unique|priorit/i.test(text)) {
+        setToast({
+          message: "Got duplicates instead of prioritized — retry after deploy or use Auto Stream.",
+          type: "error",
+        });
+      }
+
       if (res.alerts.length > 0) {
         const masked = res.alerts.map(maskIngestForDisplay);
         setGenerated((prev) => [...masked, ...prev].slice(0, 12));

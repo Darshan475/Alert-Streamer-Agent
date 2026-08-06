@@ -17,14 +17,19 @@ interface Props {
   alerts: AlertRecord[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  emptyHint?: string;
 }
 
-export const AlertList = memo(function AlertList({ alerts, selectedId, onSelect }: Props) {
+export const AlertList = memo(function AlertList({ alerts, selectedId, onSelect, emptyHint }: Props) {
   if (alerts.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-700 p-12 text-center text-slate-500">
-        No alerts yet. Use{" "}
-        <span className="text-cyan-400">Trigger Events</span> to generate alerts.
+        {emptyHint ?? (
+          <>
+            No alerts yet. Use{" "}
+            <span className="text-cyan-400">Trigger Events</span> to generate alerts.
+          </>
+        )}
       </div>
     );
   }
